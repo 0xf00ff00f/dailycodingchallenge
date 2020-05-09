@@ -6,10 +6,10 @@ add_custom_command(
     COMMAND ln -s ${ASSET_DIR} ${DEST_ASSETS}
     DEPENDS ${ASSET_DIR})
 
-add_executable(spiral main.cc ${DEST_ASSETS})
+add_executable(cube main.cc ${DEST_ASSETS})
 
 target_link_libraries(
-    spiral
+    cube
     PUBLIC
     ${OPENGL_LIBRARIES}
     ${GLFW3_LIBRARY}
@@ -17,6 +17,6 @@ target_link_libraries(
     common)
 
 target_include_directories(
-    spiral
+    cube
     PUBLIC
     "${PROJECT_SOURCE_DIR}/common")
