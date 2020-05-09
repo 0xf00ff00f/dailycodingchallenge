@@ -65,14 +65,14 @@ private:
         };
 
         const glm::vec3 v0(-1, -1, -1);
-        const glm::vec3 v1(-1,  1, -1);
-        const glm::vec3 v2( 1,  1, -1);
-        const glm::vec3 v3( 1, -1, -1);
+        const glm::vec3 v1(-1, 1, -1);
+        const glm::vec3 v2(1, 1, -1);
+        const glm::vec3 v3(1, -1, -1);
 
-        const glm::vec3 v4(-1, -1,  1);
-        const glm::vec3 v5(-1,  1,  1);
-        const glm::vec3 v6( 1,  1,  1);
-        const glm::vec3 v7( 1, -1,  1);
+        const glm::vec3 v4(-1, -1, 1);
+        const glm::vec3 v5(-1, 1, 1);
+        const glm::vec3 v6(1, 1, 1);
+        const glm::vec3 v7(1, -1, 1);
 
         add_face(v0, v1, v2, v3);
         add_face(v1, v5, v6, v2);
@@ -124,6 +124,8 @@ private:
 
     void render(const gl::shader_program &program) const
     {
+        update_grid_state();
+
         glViewport(0, 0, window_width_, window_height_);
         glClearColor(0.75, 0.75, 0.75, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -144,28 +146,32 @@ private:
         const auto view_up = glm::vec3(0, 1, 0);
         const auto view = glm::lookAt(view_pos, glm::vec3(0, 0, 0), view_up);
 
-#if 1
         const float angle = 0.3f * cosf(cur_time_ * 2.f * M_PI / CycleDuration);
         const auto model = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(-1, 1, 1));
-#else
-        const auto model = glm::mat4(1.0);
-#endif
 
-        std::vector<entity_state> states(GridSize * GridSize * GridSize);
+        program.bind();
+        program.set_uniform(program.uniform_location("modelMatrix"), model);
+        program.set_uniform(program.uniform_location("viewMatrix"), view);
+        program.set_uniform(program.uniform_location("projectionMatrix"), projection);
+        program.set_uniform(program.uniform_location("eyePosition"), view_pos);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, states_.handle());
 
-        constexpr const auto CenterEntity
-            = (GridSize / 2) * GridSize * GridSize + (GridSize / 2) * GridSize + (GridSize / 2);
+        glCullFace(GL_BACK);
+        cube_->render(GridSize * GridSize * GridSize);
+    }
 
-        for (int i = 0; i < GridSize; ++i)
-        {
-            for (int j = 0; j < GridSize; ++j)
-            {
-                for (int k = 0; k < GridSize; ++k)
-                {
+    void update_grid_state() const
+    {
+        constexpr const auto CenterEntity = (GridSize / 2) * GridSize * GridSize + (GridSize / 2) * GridSize + (GridSize / 2);
+
+        auto *state = states_.map();
+
+        for (int i = 0; i < GridSize; ++i) {
+            for (int j = 0; j < GridSize; ++j) {
+                for (int k = 0; k < GridSize; ++k) {
                     const auto index = i * GridSize * GridSize + j * GridSize + k;
                     float scale, alpha;
-                    if (index != CenterEntity)
-                    {
+                    if (index != CenterEntity) {
                         const auto start = collapse_start_[index];
                         if (cur_time_ < start) {
                             scale = 1;
@@ -178,21 +184,14 @@ private:
                             scale = in_quadratic(1 - t);
                             alpha = 1 - t;
                         }
-                    }
-                    else
-                    {
+                    } else {
                         constexpr const auto ExpansionStart = 1.2f;
                         constexpr const auto ExpansionDuration = 1.5f;
-                        if (cur_time_ < ExpansionStart)
-                        {
+                        if (cur_time_ < ExpansionStart) {
                             scale = 1;
-                        }
-                        else if (cur_time_ > ExpansionStart + ExpansionDuration)
-                        {
+                        } else if (cur_time_ > ExpansionStart + ExpansionDuration) {
                             scale = static_cast<float>(GridSize);
-                        }
-                        else
-                        {
+                        } else {
                             const auto t = (cur_time_ - ExpansionStart) / ExpansionDuration;
                             scale = 1 + out_bounce(t) * (static_cast<float>(GridSize) - 1);
                         }
@@ -207,38 +206,21 @@ private:
 
                     const auto diffuse_color = glm::vec3(1.0, 0.0, 0.0);
 
-                    auto &state = states[index];
-                    state.transform = transform_matrix * scale_matrix;
-                    state.color = glm::vec4(diffuse_color, alpha);
+                    state->transform = transform_matrix * scale_matrix;
+                    state->color = glm::vec4(diffuse_color, alpha);
+                    ++state;
                 }
             }
         }
-        states_.set_sub_data(0, states.data(), states.size());
 
-        program.bind();
-        program.set_uniform(program.uniform_location("modelMatrix"), model);
-        program.set_uniform(program.uniform_location("viewMatrix"), view);
-        program.set_uniform(program.uniform_location("projectionMatrix"), projection);
-        program.set_uniform(program.uniform_location("eyePosition"), view_pos);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, states_.handle());
-
-#if 0
-        glCullFace(GL_FRONT);
-        cube_->render(GridSize * GridSize * GridSize);
-#endif
-
-#if 1
-        glCullFace(GL_BACK);
-        cube_->render(GridSize * GridSize * GridSize);
-#endif
+        states_.unmap();
     }
 
     static constexpr auto GridSize = 5;
     static constexpr auto CellSize = 1.f / GridSize;
     static constexpr auto CollapseDuration = 0.5f;
 
-    struct entity_state
-    {
+    struct entity_state {
         glm::mat4 transform;
         glm::vec4 color;
     };

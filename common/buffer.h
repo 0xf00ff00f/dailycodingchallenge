@@ -59,6 +59,18 @@ public:
         glGetBufferSubData(target_, offset * sizeof(T), size * sizeof(T), data);
     }
 
+    T *map() const
+    {
+        bind();
+        return static_cast<T *>(glMapBuffer(target_, GL_WRITE_ONLY));
+    }
+
+    void unmap() const
+    {
+        bind();
+        glUnmapBuffer(target_);
+    }
+
 private:
     GLenum target_;
     GLuint id_;
