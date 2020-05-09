@@ -19,3 +19,4 @@ include_directories(
 add_subdirectory(common)
 add_subdirectory(spiral)
 add_subdirectory(cube)
+add_subdirectory(xcube)
