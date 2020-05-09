@@ -162,6 +162,8 @@ private:
 
     void update_grid_state() const
     {
+        const auto time = fmod(cur_time_, CycleDuration);
+
         constexpr const auto CenterEntity = (GridSize / 2) * GridSize * GridSize + (GridSize / 2) * GridSize + (GridSize / 2);
 
         auto *state = states_.map();
@@ -173,26 +175,26 @@ private:
                     float scale, alpha;
                     if (index != CenterEntity) {
                         const auto start = collapse_start_[index];
-                        if (cur_time_ < start) {
+                        if (time < start) {
                             scale = 1;
                             alpha = 1;
-                        } else if (cur_time_ > start + CollapseDuration) {
+                        } else if (time > start + CollapseDuration) {
                             scale = 0;
                             alpha = 0;
                         } else {
-                            float t = (cur_time_ - start) / CollapseDuration;
+                            float t = (time - start) / CollapseDuration;
                             scale = in_quadratic(1 - t);
                             alpha = 1 - t;
                         }
                     } else {
                         constexpr const auto ExpansionStart = 1.2f;
                         constexpr const auto ExpansionDuration = 1.5f;
-                        if (cur_time_ < ExpansionStart) {
+                        if (time < ExpansionStart) {
                             scale = 1;
-                        } else if (cur_time_ > ExpansionStart + ExpansionDuration) {
+                        } else if (time > ExpansionStart + ExpansionDuration) {
                             scale = static_cast<float>(GridSize);
                         } else {
-                            const auto t = (cur_time_ - ExpansionStart) / ExpansionDuration;
+                            const auto t = (time - ExpansionStart) / ExpansionDuration;
                             scale = 1 + out_bounce(t) * (static_cast<float>(GridSize) - 1);
                         }
                         alpha = 1;
