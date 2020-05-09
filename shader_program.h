@@ -17,7 +17,7 @@ class shader_program : private noncopyable
 public:
     shader_program();
 
-    void add_shader(GLenum type, std::string_view path);
+    void add_shader(GLenum type, const char *path);
     void link();
 
     void bind() const;

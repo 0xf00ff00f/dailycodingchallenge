@@ -10,21 +10,40 @@
 
 namespace gl {
 
+namespace {
+
+static std::vector<char> load_file(const char *path)
+{
+    std::ifstream file(path);
+    if (!file.is_open())
+        panic("failed to open %s\n", std::string(path).c_str());
+
+    auto *buf = file.rdbuf();
+
+    const std::size_t size = buf->pubseekoff(0, file.end, file.in);
+    buf->pubseekpos(0, file.in);
+
+    std::vector<char> data(size + 1);
+    buf->sgetn(data.data(), size);
+    data[size] = 0;
+
+    file.close();
+
+    return data;
+}
+
+}
+
 shader_program::shader_program()
     : id_{ glCreateProgram() }
 {
 }
 
-void shader_program::add_shader(GLenum type, std::string_view filename)
+void shader_program::add_shader(GLenum type, const char *path)
 {
     const auto shader_id = glCreateShader(type);
 
-    const auto source = [filename] {
-        std::ifstream file{ filename.data() };
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        return buffer.str();
-    }();
+    const auto source = load_file(path);
     const auto source_ptr = source.data();
     glShaderSource(shader_id, 1, &source_ptr, nullptr);
     glCompileShader(shader_id);
@@ -35,7 +54,7 @@ void shader_program::add_shader(GLenum type, std::string_view filename)
         std::array<GLchar, 64 * 1024> buf;
         GLsizei length;
         glGetShaderInfoLog(shader_id, buf.size() - 1, &length, buf.data());
-        panic("failed to compile shader %s:\n%.*s", std::string(filename).c_str(), length, buf.data());
+        panic("failed to compile shader %s:\n%.*s", path, length, buf.data());
     }
 
     glAttachShader(id_, shader_id);

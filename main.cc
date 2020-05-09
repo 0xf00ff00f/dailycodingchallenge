@@ -146,12 +146,19 @@ private:
         model_normal = glm::transpose(model_normal);
 
         program.bind();
-        program.set_uniform(program.uniform_location("mvp"), mvp);
-        program.set_uniform(program.uniform_location("normalMatrix"), model_normal);
-        program.set_uniform(program.uniform_location("modelMatrix"), model * view);
-        program.set_uniform(program.uniform_location("global_light"), glm::vec3(5, 7, 5));
+
+        constexpr const auto LocationMvp = 0;
+        constexpr const auto LocationNormalMatrix = 1;
+        constexpr const auto LocationModelMatrix = 2;
+        constexpr const auto LocationGlobalLight = 3;
+        constexpr const auto LocationUvOffset = 4;
+
+        program.set_uniform(LocationMvp, mvp);
+        program.set_uniform(LocationNormalMatrix, model_normal);
+        program.set_uniform(LocationModelMatrix, model * view);
+        program.set_uniform(LocationGlobalLight, glm::vec3(5, 7, 5));
         const auto a = static_cast<float>(cur_time_) / CycleDuration; // sinf(cur_time_ * 2.f * M_PI / cycle_duration);
-        program.set_uniform(program.uniform_location("uv_offset"), glm::vec2(-a, a));
+        program.set_uniform(LocationUvOffset, glm::vec2(-a, a));
 
         glCullFace(GL_FRONT);
         sphere_->render();

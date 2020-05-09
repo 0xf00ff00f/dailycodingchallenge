@@ -1,9 +1,7 @@
 #version 450 core
 
-uniform vec3 global_light;
-uniform vec3 pattern_dir;
-uniform float pattern_len;
-uniform vec2 uv_offset;
+layout(location=3) uniform vec3 globalLight;
+layout(location=4) uniform vec2 uvOffset;
 
 in vec3 vs_position;
 in vec3 vs_normal;
@@ -30,7 +28,7 @@ float pattern(vec2 id, vec2 p, vec2 offs)
 void main(void)
 {
     vec2 uv = vec2(vs_uv.x * 4.0, vs_uv.y);
-    uv += uv_offset;
+    uv += uvOffset;
     uv *= 16.0;
 
     vec2 p = fract(uv) - 0.5;
@@ -48,6 +46,6 @@ void main(void)
 
     vec3 color = vec3(l);
 
-    float v = ambient + max(dot(vs_normal, normalize(global_light - vs_position)), 0.0);
+    float v = ambient + max(dot(vs_normal, normalize(globalLight - vs_position)), 0.0);
     frag_color = vec4(v * color, 0.4);
 }
