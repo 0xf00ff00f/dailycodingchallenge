@@ -16,14 +16,5 @@ include_directories(
     ${GLEW_INCLUDE_DIR}
     ${GLM_INCLUDE_DIR})
 
-add_executable(demo
-    main.cc
-    window.cc
-    shader_program.cc
-    util.cc)
-
-target_link_libraries(
-    demo
-    ${OPENGL_LIBRARIES}
-    ${GLFW3_LIBRARY}
-    ${GLEW_LIBRARIES})
+add_subdirectory(common)
+add_subdirectory(spiral)
