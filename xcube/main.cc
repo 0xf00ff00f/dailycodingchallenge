@@ -200,15 +200,13 @@ private:
                         alpha = 1;
                     }
 
-                    const float x = (static_cast<float>(i) - 0.5f * static_cast<float>(GridSize - 1)) * CellSize;
-                    const float y = (static_cast<float>(j) - 0.5f * static_cast<float>(GridSize - 1)) * CellSize;
-                    const float z = (static_cast<float>(k) - 0.5f * static_cast<float>(GridSize - 1)) * CellSize;
-                    const auto transform_matrix = glm::translate(glm::mat4(1.0), glm::vec3(x, y, z));
+                    const auto v = CellSize * (glm::vec3(i, j, k) - 0.5f * glm::vec3(GridSize - 1));
+                    const auto translate_matrix = glm::translate(glm::mat4(1.0), v);
                     const auto scale_matrix = glm::scale(glm::mat4(1.0), glm::vec3(scale * 0.5 * CellSize));
 
                     const auto diffuse_color = glm::vec3(1.0, 0.0, 0.0);
 
-                    state->transform = transform_matrix * scale_matrix;
+                    state->transform = translate_matrix * scale_matrix;
                     state->color = glm::vec4(diffuse_color, alpha);
                     ++state;
                 }
