@@ -6,7 +6,7 @@ add_custom_command(
     COMMAND ln -s ${ASSET_DIR} ${DEST_ASSETS}
     DEPENDS ${ASSET_DIR})
 
-add_executable(xcube main.cc tween.cc ${DEST_ASSETS})
+add_executable(xcube main.cc ${DEST_ASSETS})
 
 target_link_libraries(
     xcube
