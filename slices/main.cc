@@ -183,6 +183,7 @@ static glm::mat4 view;
 
 struct Node
 {
+    virtual ~Node() = default;
     virtual void render(const glm::mat4 &m, float offset) const = 0;
 };
 
