@@ -21,6 +21,10 @@
 // #define DUMP_FRAMES
 
 constexpr const auto CycleDuration = 3.f;
+
+constexpr const auto ExplodeDuration = 0.25f;
+constexpr const auto ImplodeDuration = 0.125f;
+
 #ifdef DUMP_FRAMES
 constexpr const auto FramesPerSecond = 40;
 #else
@@ -184,18 +188,38 @@ static glm::mat4 view;
 struct Node
 {
     virtual ~Node() = default;
-    virtual void render(const glm::mat4 &m, float offset) const = 0;
+    virtual void render(const glm::mat4 &m, float time) const = 0;
 };
 
 struct Split : Node
 {
-    void render(const glm::mat4 &m, float offset) const override
+    void render(const glm::mat4 &m, float time) const override
     {
-        front->render(m * glm::translate(glm::mat4(1), -offset * normal), offset);
-        back->render(m * glm::translate(glm::mat4(1), offset * normal), offset);
+        constexpr const auto MaxOffset = 0.3f;
+
+        const auto offset = [this, time]() -> float {
+            if (time < start_explode) {
+                return 0;
+            } else if (time < start_explode + ExplodeDuration) {
+                float t = (time - start_explode) / ExplodeDuration;
+                return in_quadratic(t) * MaxOffset;
+            } else if (time < start_implode) {
+                return MaxOffset;
+            } else if (time < start_implode + ImplodeDuration) {
+                float t = (time - start_implode) / ImplodeDuration;
+                return out_quadratic(1 - t) * MaxOffset;
+            } else {
+                return 0;
+            }
+        }();
+
+        front->render(m * glm::translate(glm::mat4(1), -offset * normal), time);
+        back->render(m * glm::translate(glm::mat4(1), offset * normal), time);
     }
 
     glm::vec3 normal;
+    float start_explode;
+    float start_implode;
     std::unique_ptr<Node> front, back;
 };
 
@@ -245,10 +269,15 @@ std::unique_ptr<Node> build_tree(const Mesh &mesh, int depth)
         return std::unique_ptr<Node>(leaf);
     }
 
+    constexpr const auto StartExplode = 0.25;
+    constexpr const auto StartImplode = CycleDuration - StartExplode - ImplodeDuration;
+
     auto split = new Split;
     split->normal = plane.normal;
     split->front = build_tree(front_mesh, depth + 1);
     split->back = build_tree(back_mesh, depth + 1);
+    split->start_explode = StartExplode + 0.25 * depth;
+    split->start_implode = StartImplode - 0.5 * 0.125 * depth;
     return std::unique_ptr<Node>(split);
 }
 
@@ -307,30 +336,7 @@ private:
         program_->bind();
         program_->set_uniform(program_->uniform_location("global_light"), glm::vec3(5, -5, 5));
 
-        const auto time = fmod(cur_time_, CycleDuration);
-
-        constexpr const auto TransitionDuration = 0.5f;
-        constexpr const auto StartExplode = 0.8;
-        constexpr const auto StartImplode = CycleDuration - StartExplode - TransitionDuration;
-        constexpr const auto MaxOffset = 0.3f;
-
-        const auto offset = [time]() -> float {
-            if (time < StartExplode) {
-                return 0;
-            } else if (time < StartExplode + TransitionDuration) {
-                float t = (time - StartExplode) / TransitionDuration;
-                return in_quadratic(t) * MaxOffset;
-            } else if (time < StartImplode) {
-                return MaxOffset;
-            } else if (time < StartImplode + TransitionDuration) {
-                float t = (time - StartImplode) / TransitionDuration;
-                return out_quadratic(1 - t) * MaxOffset;
-            } else {
-                return 0;
-            }
-        }();
-
-        split_tree_->render(model, offset);
+        split_tree_->render(model, fmod(cur_time_, CycleDuration));
     }
 
     int window_width_;
