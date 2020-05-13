@@ -191,11 +191,11 @@ struct Split : Node
 {
     void render(const glm::mat4 &m, float offset) const override
     {
-        front->render(m * glm::translate(glm::mat4(1), -offset * plane.normal), offset);
-        back->render(m * glm::translate(glm::mat4(1), offset * plane.normal), offset);
+        front->render(m * glm::translate(glm::mat4(1), -offset * normal), offset);
+        back->render(m * glm::translate(glm::mat4(1), offset * normal), offset);
     }
 
-    Plane plane;
+    glm::vec3 normal;
     std::unique_ptr<Node> front, back;
 };
 
@@ -246,7 +246,7 @@ std::unique_ptr<Node> build_tree(const Mesh &mesh, int depth)
     }
 
     auto split = new Split;
-    split->plane = plane;
+    split->normal = plane.normal;
     split->front = build_tree(front_mesh, depth + 1);
     split->back = build_tree(back_mesh, depth + 1);
     return std::unique_ptr<Node>(split);
