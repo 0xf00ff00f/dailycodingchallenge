@@ -44,7 +44,7 @@ struct Plane {
     glm::vec3 normal;
 };
 
-std::tuple<std::vector<glm::vec3>, std::vector<glm::vec3>> split(const std::vector<glm::vec3> &verts, const Plane &plane)
+auto split(const std::vector<glm::vec3> &verts, const Plane &plane)
 {
     std::vector<glm::vec3> front_verts, back_verts;
 
@@ -72,10 +72,10 @@ std::tuple<std::vector<glm::vec3>, std::vector<glm::vec3>> split(const std::vect
         }
     }
 
-    return {front_verts, back_verts};
+    return std::make_tuple(front_verts, back_verts);
 }
 
-std::tuple<Mesh, Mesh> split(const Mesh &mesh, const Plane &plane)
+auto split(const Mesh &mesh, const Plane &plane)
 {
     Mesh front_mesh, back_mesh;
 
@@ -111,7 +111,7 @@ std::tuple<Mesh, Mesh> split(const Mesh &mesh, const Plane &plane)
         back_mesh.push_back({ -plane.normal, glm::vec3(1, 0, 0), plane_verts });
     }
 
-    return { front_mesh, back_mesh };
+    return std::make_tuple(front_mesh, back_mesh);
 }
 
 class mesh_geometry
