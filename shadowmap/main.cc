@@ -183,7 +183,8 @@ private:
         const auto monkey_model = glm::rotate(glm::mat4(1.0), cur_time_, glm::vec3(0, 1, 0));
 
         glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_LEQUAL);
+        glDepthFunc(GL_LESS);
+
         glDisable(GL_CULL_FACE);
 
         // render shadow
