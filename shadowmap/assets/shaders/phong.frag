@@ -9,7 +9,7 @@ in vec3 vs_position;
 in vec4 vs_color;
 in vec4 vs_positionInLightSpace;
 
-const vec3 ambient = vec3(0.25);
+const vec3 ambient = vec3(0.05);
 const float shininess = 1.0;
 const vec3 light_color = vec3(1.0, 1.0, 1.0);
 const float kd = 0.5;
@@ -37,9 +37,36 @@ vec3 phong()
     return diffuse + specular;
 }
 
+float shadowFactor()
+{
+#if 0
+    float factor = textureProj(shadowMapTexture, vs_positionInLightSpace);
+#else
+    vec3 projCoords = vs_positionInLightSpace.xyz / vs_positionInLightSpace.w;
+    vec2 uvCoords = projCoords.xy;
+
+    ivec2 texDim = textureSize(shadowMapTexture, 0).xy;
+    float xOffset = 1.0 / float(texDim.x);
+    float yOffset = 1.0 / float(texDim.y);
+
+    const float range = 1;
+    const float shadowFactor = 0.25;
+
+    float factor = 0.0;
+    for (float y = -range; y <= range; ++y)
+    {
+        for (float x = -range; x <= range; ++x)
+        {
+            factor += texture(shadowMapTexture, vec3(projCoords + vec3(x * xOffset, y * yOffset, 0)));
+        }
+    }
+    factor /= ((range * 2 + 1) * (range * 2 + 1));
+#endif
+    return min(factor + 0.5, 1.0);
+}
+
 void main(void)
 {
-    float shadowFactor = textureProj(shadowMapTexture, vs_positionInLightSpace);
-    vec3 color = phong() * shadowFactor;
+    vec3 color = phong() * shadowFactor();
     frag_color = vec4(color, vs_color.w);
 }
