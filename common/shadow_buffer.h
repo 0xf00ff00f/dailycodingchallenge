@@ -6,11 +6,11 @@
 
 namespace gl {
 
-class framebuffer : private noncopyable
+class shadow_buffer : private noncopyable
 {
 public:
-    framebuffer(int width, int height, GLint internal_format = GL_RGBA, GLenum format = GL_RGBA, GLenum type = GL_UNSIGNED_BYTE);
-    ~framebuffer();
+    shadow_buffer(int width, int height);
+    ~shadow_buffer();
 
     void bind() const;
     void unbind() const;

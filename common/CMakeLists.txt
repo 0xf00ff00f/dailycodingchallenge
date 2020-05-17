@@ -3,4 +3,4 @@ add_library(common
     util.cc
     window.cc
     tween.cc
-    framebuffer.cc)
+    shadow_buffer.cc)

@@ -5,7 +5,7 @@
 #include "shader_program.h"
 #include "util.h"
 #include "buffer.h"
-#include "framebuffer.h"
+#include "shadow_buffer.h"
 #include "tween.h"
 
 #include <GL/glew.h>
@@ -152,7 +152,7 @@ public:
         , window_height_(window_height)
         , mesh_(new Mesh("assets/meshes/monkey.obj"))
         , plane_(new Plane(glm::vec3(0, 0, -2), glm::vec3(3, 0, 0), glm::vec3(0, 4, 0)))
-        , shadow_buffer_(ShadowWidth, ShadowHeight, GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_FLOAT)
+        , shadow_buffer_(ShadowWidth, ShadowHeight)
     {
         initialize_shader();
     }
@@ -256,7 +256,7 @@ private:
     gl::shader_program shadow_program_;
     std::unique_ptr<Mesh> mesh_;
     std::unique_ptr<Plane> plane_;
-    gl::framebuffer shadow_buffer_;
+    gl::shadow_buffer shadow_buffer_;
 };
 
 int main()

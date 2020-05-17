@@ -1,8 +1,8 @@
-#include "framebuffer.h"
+#include "shadow_buffer.h"
 
 namespace gl {
 
-framebuffer::framebuffer(int width, int height, GLint internal_format, GLenum format, GLenum type)
+shadow_buffer::shadow_buffer(int width, int height)
     : width_{ width }
     , height_{ height }
 {
@@ -23,10 +23,10 @@ framebuffer::framebuffer(int width, int height, GLint internal_format, GLenum fo
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-    glTexImage2D(GL_TEXTURE_2D, 0, internal_format, width_, height_, 0, format, type, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, width_, height_, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
     unbind_texture();
 
-    // initialize framebuffer/renderbuffer
+    // initialize shadow_buffer/renderbuffer
 
     bind();
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texture_id_, 0);
@@ -35,27 +35,27 @@ framebuffer::framebuffer(int width, int height, GLint internal_format, GLenum fo
     unbind();
 }
 
-framebuffer::~framebuffer()
+shadow_buffer::~shadow_buffer()
 {
     glDeleteFramebuffers(1, &fbo_id_);
 }
 
-void framebuffer::bind() const
+void shadow_buffer::bind() const
 {
     glBindFramebuffer(GL_FRAMEBUFFER, fbo_id_);
 }
 
-void framebuffer::unbind() const
+void shadow_buffer::unbind() const
 {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void framebuffer::bind_texture() const
+void shadow_buffer::bind_texture() const
 {
     glBindTexture(GL_TEXTURE_2D, texture_id_);
 }
 
-void framebuffer::unbind_texture() const
+void shadow_buffer::unbind_texture() const
 {
     glBindTexture(GL_TEXTURE_2D, 0);
 }

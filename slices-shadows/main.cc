@@ -5,7 +5,7 @@
 #include "shader_program.h"
 #include "util.h"
 #include "tween.h"
-#include "framebuffer.h"
+#include "shadow_buffer.h"
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -19,7 +19,7 @@
 #include <iostream>
 #include <memory>
 
-#define DUMP_FRAMES
+// #define DUMP_FRAMES
 
 constexpr const auto CycleDuration = 3.f;
 
@@ -312,7 +312,7 @@ public:
         : window_width_(window_width)
         , window_height_(window_height)
         , plane_(glm::vec3(0, 0, -2.5), glm::vec3(10, 0, 0), glm::vec3(0, 10, 0))
-        , shadow_buffer_(ShadowWidth, ShadowHeight, GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT, GL_FLOAT)
+        , shadow_buffer_(ShadowWidth, ShadowHeight)
     {
         initialize_shader();
         split_tree_ = build_tree(make_cube(), 0);
@@ -415,7 +415,7 @@ private:
     float cur_time_ = 0;
     std::unique_ptr<Node> split_tree_;
     PlaneGeometry plane_;
-    gl::framebuffer shadow_buffer_;
+    gl::shadow_buffer shadow_buffer_;
     gl::shader_program program_;
     gl::shader_program shadow_program_;
 };
