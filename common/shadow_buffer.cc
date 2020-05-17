@@ -38,6 +38,7 @@ shadow_buffer::shadow_buffer(int width, int height)
 shadow_buffer::~shadow_buffer()
 {
     glDeleteFramebuffers(1, &fbo_id_);
+    glDeleteTextures(1, &texture_id_);
 }
 
 void shadow_buffer::bind() const
