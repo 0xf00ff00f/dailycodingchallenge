@@ -44,6 +44,11 @@ public:
         set_uniform(uniform_location(name), value);
     }
 
+    GLuint handle() const
+    {
+        return id_;
+    }
+
 private:
     GLuint id_;
 };
