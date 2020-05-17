@@ -2,7 +2,10 @@
 
 #include "panic.h"
 
+#include <GL/glew.h>
 #include <GLFW/glfw3.h>
+
+#include <iostream>
 
 namespace gl {
 
@@ -23,6 +26,14 @@ window::window(int width, int height, const char *title)
 
     glfwMakeContextCurrent(window_);
     glfwSwapInterval(1);
+
+    glewInit();
+
+    glEnable(GL_DEBUG_OUTPUT);
+    glDebugMessageCallback(
+        [](GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei /*length*/, const GLchar *message,
+           const void * /*user*/) { std::cout << source << ':' << type << ':' << severity << ':' << message << '\n'; },
+        nullptr);
 }
 
 window::~window()
