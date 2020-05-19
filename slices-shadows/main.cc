@@ -260,7 +260,7 @@ struct Leaf : Node
 {
     void render(const gl::shader_program &program, const glm::mat4 &model, float) const override
     {
-        program.set_uniform(program.uniform_location("modelMatrix"), model);
+        program.set_uniform("modelMatrix", model);
         mesh->render();
     }
 
@@ -365,13 +365,13 @@ private:
             glm::rotate(glm::mat4(1.0f), static_cast<float>(0.25f * M_PI), glm::vec3(0, 1, 0));
 
         shadow_program_.bind();
-        shadow_program_.set_uniform(shadow_program_.uniform_location("viewMatrix"), light_view);
-        shadow_program_.set_uniform(shadow_program_.uniform_location("projectionMatrix"), light_projection);
+        shadow_program_.set_uniform("viewMatrix", light_view);
+        shadow_program_.set_uniform("projectionMatrix", light_projection);
 
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(4, 4);
 
-        shadow_program_.set_uniform(shadow_program_.uniform_location("modelMatrix"), glm::mat4(1.0));
+        shadow_program_.set_uniform("modelMatrix", glm::mat4(1.0));
         plane_.render();
         split_tree_->render(shadow_program_, model, fmod(cur_time_, CycleDuration));
 
@@ -395,14 +395,14 @@ private:
         shadow_buffer_.bind_texture();
 
         program_.bind();
-        program_.set_uniform(program_.uniform_location("lightPosition"), light_position);
-        program_.set_uniform(program_.uniform_location("eyePosition"), view_pos);
-        program_.set_uniform(program_.uniform_location("projectionMatrix"), projection);
-        program_.set_uniform(program_.uniform_location("viewMatrix"), view);
-        program_.set_uniform(program_.uniform_location("lightViewProjection"), light_projection * light_view);
-        program_.set_uniform(program_.uniform_location("shadowMapTexture"), 0);
+        program_.set_uniform("lightPosition", light_position);
+        program_.set_uniform("eyePosition", view_pos);
+        program_.set_uniform("projectionMatrix", projection);
+        program_.set_uniform("viewMatrix", view);
+        program_.set_uniform("lightViewProjection", light_projection * light_view);
+        program_.set_uniform("shadowMapTexture", 0);
 
-        program_.set_uniform(program_.uniform_location("modelMatrix"), glm::mat4(1.0));
+        program_.set_uniform("modelMatrix", glm::mat4(1.0));
         plane_.render();
         split_tree_->render(program_, model, fmod(cur_time_, CycleDuration));
     }

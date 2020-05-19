@@ -38,6 +38,12 @@ public:
     void set_uniform(int location, const glm::mat3 &mat) const;
     void set_uniform(int location, const glm::mat4 &mat) const;
 
+    template<typename T>
+    void set_uniform(std::string_view name, const T &value) const
+    {
+        set_uniform(uniform_location(name), value);
+    }
+
 private:
     GLuint id_;
 };
