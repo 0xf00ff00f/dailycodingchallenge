@@ -12,6 +12,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/string_cast.hpp>
 
 #include <algorithm>
 #include <iostream>
@@ -43,37 +45,130 @@ struct Bezier
 
 using Path = std::vector<Bezier>;
 
+float frand()
+{
+    return static_cast<float>(rand()) / RAND_MAX;
+}
+
+void subdivide(std::vector<glm::vec3> &points, const glm::vec3 &from, const glm::vec3 &to, int level)
+{
+    if (level > 0)
+    {
+        auto m = 0.5f * (from + to);
+
+        // perturb
+        const auto d = glm::normalize(to - from);
+        const auto n = glm::vec3(0, 0, 1);
+        const auto u = glm::cross(d, n);
+
+        const auto perturbed = [&to, &from](float factor, const glm::vec3 &v) {
+            const auto l = glm::distance(to, from);
+            return factor * (2.0f * frand() - 1.0f) * l * v;
+        };
+
+        m += perturbed(0.15f, u) + perturbed(0.15f, n);
+
+        subdivide(points, from, m, level - 1);
+        subdivide(points, m, to, level - 1);
+    }
+    else
+    {
+        points.push_back(from);
+    }
+}
+
 class StripGeometry
 {
 public:
-    StripGeometry(const glm::vec3 &p0, const glm::vec3 &p1, const glm::vec3 &p2)
-        : path_{ p0, p1, p2 }
+    StripGeometry(float angle_offset)
     {
-        initialize();
+        initialize(angle_offset);
         geometry_.set_data(verts_);
     }
 
     void render() const
     {
         geometry_.bind();
-        glDrawArrays(GL_LINE_STRIP, 0, verts_.size());
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, verts_.size());
     }
 
 private:
-    void initialize()
+    void initialize(float angle_offset)
     {
-        constexpr const auto NumPoints = 20;
-        for (int i = 0; i < NumPoints; ++i)
+        std::vector<glm::vec3> control_points;
+
+        constexpr auto CircleVerts = 5;
+        constexpr auto CircleRadius = 1.0f;
+
+        const auto vertex_at = [](int index) {
+            const float angle = static_cast<float>(index) * 2.0 * M_PI / CircleVerts;
+            const float s = std::sin(angle);
+            const float c = std::cos(angle);
+            return glm::vec3(c * CircleRadius, s * CircleRadius, 0);
+        };
+
+        for (int i = 0; i < CircleVerts; ++i)
         {
-            const auto t = static_cast<float>(i) / (NumPoints - 1);
-            verts_.push_back({ path_.position(t), glm::normalize(path_.direction(t)) });
+            const auto v0 = vertex_at(i);
+            const auto v1 = vertex_at(i + 1);
+            subdivide(control_points, v0, v1, 1);
+        }
+
+        std::vector<glm::vec3> path_points;
+
+        const auto num_control_points = control_points.size();
+        for (int i = 0; i < num_control_points; ++i)
+        {
+            const auto &va = control_points[(i + num_control_points - 1) % num_control_points];
+            const auto &vb = control_points[i];
+            const auto &vc = control_points[(i + 1) % num_control_points];
+
+            const auto segment = Bezier{0.5f * (va + vb), vb, 0.5f * (vb + vc)};
+
+            constexpr const auto PointsPerSegment = 60;
+            constexpr const auto TurnsPerSegment = 1;
+            constexpr const auto CoilRadius = 0.2f;
+
+            for (int i = 0; i < PointsPerSegment; ++i)
+            {
+                const auto t = static_cast<float>(i) / PointsPerSegment;
+                const auto p = segment.position(t);
+
+                const auto d = glm::normalize(segment.direction(t));
+                const auto s = glm::cross(d, glm::vec3(0, 0, 1));
+                const auto n = glm::cross(s, d);
+
+                const float a = angle_offset +
+                    static_cast<float>(i) * TurnsPerSegment * 2.0 * M_PI / PointsPerSegment;
+
+                // there's probably a cleaner way to do this with matrices but screw it
+                const auto r = p + (std::cos(a) * s + std::sin(a) * n) * CoilRadius;
+                path_points.push_back(r);
+            }
+        }
+
+        const auto num_path_points = path_points.size();
+        for (int i = 0; i <= num_path_points; ++i)
+        {
+            const auto &v0 = path_points[i % num_path_points];
+            const auto &v1 = path_points[(i + 1) % num_path_points];
+
+            const auto d = glm::normalize(v1 - v0);
+            const auto s = glm::cross(d, glm::vec3(0, 0, 1));
+            const auto n = glm::cross(s, d);
+
+            const auto t = static_cast<float>(i) / num_path_points;
+
+            constexpr const auto TapeWidth = 0.05f;
+
+            verts_.emplace_back(v0 - TapeWidth * s, n, glm::vec2(0, t));
+            verts_.emplace_back(v0 + TapeWidth * s, n, glm::vec2(1, t));
         }
     }
 
-    using vertex = std::tuple<glm::vec3, glm::vec3>; // position, direction
+    using vertex = std::tuple<glm::vec3, glm::vec3, glm::vec2>; // position, direction, uv
     std::vector<vertex> verts_;
     gl::geometry geometry_;
-    Bezier path_;
 };
 
 class demo
@@ -82,9 +177,14 @@ public:
     demo(int window_width, int window_height)
         : window_width_(window_width)
         , window_height_(window_height)
-        , strip_(new StripGeometry(glm::vec3(-1, -1, -1), glm::vec3(0, 0, 2), glm::vec3(1, 1, -1)))
     {
         initialize_shader();
+
+        for (int i = 0; i < NumStrips; ++i)
+        {
+            const float a = static_cast<float>(i) * 2.0f * M_PI / NumStrips;
+            strips_.emplace_back(new StripGeometry(a));
+        }
     }
 
     void render_and_step(float dt)
@@ -104,11 +204,8 @@ private:
     void render(const gl::shader_program &program) const
     {
         glViewport(0, 0, window_width_, window_height_);
-#if 1
         glClearColor(0.75, 0.75, 0.75, 0);
-#else
-        glClearColor(1, 1, 1, 0);
-#endif
+
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glEnable(GL_MULTISAMPLE);
@@ -119,17 +216,17 @@ private:
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        glDisable(GL_CULL_FACE);
+        glEnable(GL_CULL_FACE);
 
         const auto projection =
                 glm::perspective(glm::radians(45.0f), static_cast<float>(window_width_) / window_height_, 0.1f, 100.f);
-        const auto view_pos = glm::vec3(2.5, -2.5, 2.5);
+        const auto view_pos = glm::vec3(0, 0, 3);
         const auto view_up = glm::vec3(0, 1, 0);
         const auto view = glm::lookAt(view_pos, glm::vec3(0, 0, 0), view_up);
 
-#if 1
-        const float angle = 0.3f * cosf(cur_time_ * 2.f * M_PI / CycleDuration);
-        const auto model = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(-1, 1, 1));
+#if 0
+        const float angle = 0.3f * cur_time_ * 2.f * M_PI / CycleDuration;
+        const auto model = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0, 1, 0));
 #else
         const auto model = glm::identity<glm::mat4x4>();
 #endif
@@ -140,35 +237,37 @@ private:
         model_normal = glm::transpose(model_normal);
 
         program.bind();
-        program.set_uniform(program.uniform_location("mvp"), mvp);
-        program.set_uniform(program.uniform_location("normalMatrix"), model_normal);
-        program.set_uniform(program.uniform_location("modelMatrix"), model * view);
-        program.set_uniform(program.uniform_location("global_light"), glm::vec3(5, -5, 5));
+        program.set_uniform("mvp", mvp);
+        program.set_uniform("modelMatrix", model);
+        program.set_uniform("lightPosition", glm::vec3(5, -5, 5));
 
+        static const std::array<glm::vec3, NumStrips> StripColors = {
+            glm::vec3(0, 0, 1),
+            glm::vec3(0, 1, 0),
+            glm::vec3(1, 0, 0),
+            glm::vec3(0, 1, 1),
+            glm::vec3(1, 1, 0),
+        };
+        for (int i = 0; i < strips_.size(); ++i)
         {
-#if 1
-        const float angle = 0.3f * sinf(cur_time_ * 2.f * M_PI / CycleDuration);
-#else
-        const float angle = 0.3f * cur_time_ * 2.f * M_PI / CycleDuration;
-#endif
-        const auto texture_transform = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(1, 1, 1));
-        program.set_uniform(program.uniform_location("texture_transform"), texture_transform);
+            program.set_uniform("color", StripColors[i]);
+            strips_[i]->render();
         }
-
-        strip_->render();
     }
+
+    static constexpr auto NumStrips = 5;
 
     int window_width_;
     int window_height_;
     float cur_time_ = 0;
     gl::shader_program program_;
-    std::unique_ptr<StripGeometry> strip_;
+    std::vector<std::unique_ptr<StripGeometry>> strips_;
 };
 
 int main()
 {
-    constexpr auto window_width = 512;
-    constexpr auto window_height = 512;
+    constexpr auto window_width = 800;
+    constexpr auto window_height = 800;
 
     gl::window w(window_width, window_height, "demo");
 
