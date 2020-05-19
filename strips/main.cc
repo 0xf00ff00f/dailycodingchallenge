@@ -66,7 +66,7 @@ void subdivide(std::vector<glm::vec3> &points, const glm::vec3 &from, const glm:
             return factor * (2.0f * frand() - 1.0f) * l * v;
         };
 
-        m += perturbed(0.15f, u) + perturbed(0.15f, n);
+        m += perturbed(0.25f, u) + perturbed(0.25f, n);
 
         subdivide(points, from, m, level - 1);
         subdivide(points, m, to, level - 1);
@@ -80,9 +80,9 @@ void subdivide(std::vector<glm::vec3> &points, const glm::vec3 &from, const glm:
 class StripGeometry
 {
 public:
-    StripGeometry(float angle_offset)
+    StripGeometry(float angle_offset, float coil_radius)
     {
-        initialize(angle_offset);
+        initialize(angle_offset, coil_radius);
         geometry_.set_data(verts_);
     }
 
@@ -93,7 +93,7 @@ public:
     }
 
 private:
-    void initialize(float angle_offset)
+    void initialize(float angle_offset, float coil_radius)
     {
         std::vector<glm::vec3> control_points;
 
@@ -127,7 +127,6 @@ private:
 
             constexpr const auto PointsPerSegment = 60;
             constexpr const auto TurnsPerSegment = 1;
-            constexpr const auto CoilRadius = 0.2f;
 
             for (int i = 0; i < PointsPerSegment; ++i)
             {
@@ -142,7 +141,7 @@ private:
                     static_cast<float>(i) * TurnsPerSegment * 2.0 * M_PI / PointsPerSegment;
 
                 // there's probably a cleaner way to do this with matrices but screw it
-                const auto r = p + (std::cos(a) * s + std::sin(a) * n) * CoilRadius;
+                const auto r = p + (std::cos(a) * s + std::sin(a) * n) * coil_radius;
                 path_points.push_back(r);
             }
         }
@@ -159,7 +158,7 @@ private:
 
             const auto t = static_cast<float>(i) / num_path_points;
 
-            constexpr const auto TapeWidth = 0.05f;
+            constexpr const auto TapeWidth = 0.025f;
 
             verts_.emplace_back(v0 - TapeWidth * s, n, glm::vec2(0, t));
             verts_.emplace_back(v0 + TapeWidth * s, n, glm::vec2(1, t));
@@ -183,7 +182,14 @@ public:
         for (int i = 0; i < NumStrips; ++i)
         {
             const float a = static_cast<float>(i) * 2.0f * M_PI / NumStrips;
-            strips_.emplace_back(new StripGeometry(a));
+            const auto coil_radius = 0.1f + frand() * 0.1f;
+            strips_.emplace_back(new StripGeometry(a, coil_radius));
+
+            auto &params = params_[i];
+            params.speed = 0.1f + frand() * 0.3f;
+            params.length = 02.f + frand() * 0.4f;
+            params.color = glm::vec3(frand(), frand(), frand()) * 0.5f + glm::vec3(0.5f);
+            // this sucks
         }
     }
 
@@ -224,8 +230,8 @@ private:
         const auto view_up = glm::vec3(0, 1, 0);
         const auto view = glm::lookAt(view_pos, glm::vec3(0, 0, 0), view_up);
 
-#if 0
-        const float angle = 0.3f * cur_time_ * 2.f * M_PI / CycleDuration;
+#if 1
+        const float angle = 0.3f * cosf(cur_time_ * 2.f * M_PI / CycleDuration);
         const auto model = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0, 1, 0));
 #else
         const auto model = glm::identity<glm::mat4x4>();
@@ -241,27 +247,34 @@ private:
         program.set_uniform("modelMatrix", model);
         program.set_uniform("lightPosition", glm::vec3(5, -5, 5));
 
-        static const std::array<glm::vec3, NumStrips> StripColors = {
-            glm::vec3(0, 0, 1),
-            glm::vec3(0, 1, 0),
-            glm::vec3(1, 0, 0),
-            glm::vec3(0, 1, 1),
-            glm::vec3(1, 1, 0),
-        };
         for (int i = 0; i < strips_.size(); ++i)
         {
-            program.set_uniform("color", StripColors[i]);
+            const auto &params = params_[i];
+
+            program.set_uniform("color", params.color);
+
+            auto v_start = fmod(cur_time_ * params.speed, 1.0f);
+            auto v_end = fmod(v_start + params.length, 1.0f);
+            program.set_uniform("vRange", glm::vec2(v_start, v_end));
+
             strips_[i]->render();
         }
     }
 
-    static constexpr auto NumStrips = 5;
+    static constexpr auto NumStrips = 1;
 
     int window_width_;
     int window_height_;
     float cur_time_ = 0;
     gl::shader_program program_;
     std::vector<std::unique_ptr<StripGeometry>> strips_;
+    struct StripParams
+    {
+        glm::vec3 color;
+        float speed;
+        float length;
+    };
+    std::array<StripParams, NumStrips> params_;
 };
 
 int main()
