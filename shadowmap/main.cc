@@ -200,16 +200,16 @@ private:
         const auto light_view = glm::lookAt(light_position, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
 
         shadow_program_.bind();
-        shadow_program_.set_uniform(program_.uniform_location("viewMatrix"), light_view);
-        shadow_program_.set_uniform(program_.uniform_location("projectionMatrix"), light_projection);
+        shadow_program_.set_uniform(shadow_program_.uniform_location("viewMatrix"), light_view);
+        shadow_program_.set_uniform(shadow_program_.uniform_location("projectionMatrix"), light_projection);
 
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(4, 4);
 
-        shadow_program_.set_uniform(program_.uniform_location("modelMatrix"), model);
+        shadow_program_.set_uniform(shadow_program_.uniform_location("modelMatrix"), model);
         plane_->render();
 
-        shadow_program_.set_uniform(program_.uniform_location("modelMatrix"), model * monkey_model);
+        shadow_program_.set_uniform(shadow_program_.uniform_location("modelMatrix"), model * monkey_model);
         mesh_->render();
 
         glDisable(GL_POLYGON_OFFSET_FILL);

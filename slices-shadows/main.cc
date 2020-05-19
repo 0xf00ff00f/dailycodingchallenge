@@ -365,13 +365,13 @@ private:
             glm::rotate(glm::mat4(1.0f), static_cast<float>(0.25f * M_PI), glm::vec3(0, 1, 0));
 
         shadow_program_.bind();
-        shadow_program_.set_uniform(program_.uniform_location("viewMatrix"), light_view);
-        shadow_program_.set_uniform(program_.uniform_location("projectionMatrix"), light_projection);
+        shadow_program_.set_uniform(shadow_program_.uniform_location("viewMatrix"), light_view);
+        shadow_program_.set_uniform(shadow_program_.uniform_location("projectionMatrix"), light_projection);
 
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(4, 4);
 
-        shadow_program_.set_uniform(program_.uniform_location("modelMatrix"), glm::mat4(1.0));
+        shadow_program_.set_uniform(shadow_program_.uniform_location("modelMatrix"), glm::mat4(1.0));
         plane_.render();
         split_tree_->render(shadow_program_, model, fmod(cur_time_, CycleDuration));
 
