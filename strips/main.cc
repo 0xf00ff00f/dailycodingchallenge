@@ -225,7 +225,7 @@ public:
             auto &params = params_[i];
             params.offset = frand();
             params.speed = /* 0.1f + frand() * 0.3f */ static_cast<float>(1 + rand() % 2) / CycleDuration;
-            params.length = 03.f + frand() * 0.4f;
+            params.length = 0.1f + frand() * 0.2f;
             params.color = glm::vec3(frand(), frand(), frand()) * 0.5f + glm::vec3(0.5f);
             // this sucks
         }
