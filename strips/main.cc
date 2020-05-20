@@ -4,6 +4,7 @@
 #include "geometry.h"
 #include "shader_program.h"
 #include "util.h"
+#include "shadow_buffer.h"
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -76,6 +77,40 @@ void subdivide(std::vector<glm::vec3> &points, const glm::vec3 &from, const glm:
         points.push_back(from);
     }
 }
+
+class PlaneGeometry
+{
+public:
+    PlaneGeometry(const glm::vec3 &center, const glm::vec3 &up, const glm::vec3 &side)
+    {
+        initialize_geometry(center, up, side);
+        geometry_.set_data(verts_);
+    }
+
+    void render() const
+    {
+        geometry_.bind();
+        glDrawArrays(GL_TRIANGLES, 0, verts_.size());
+    }
+
+private:
+    void initialize_geometry(const glm::vec3 &center, const glm::vec3 &up, const glm::vec3 &side)
+    {
+        const auto normal = glm::normalize(glm::cross(up, side));
+
+        verts_.push_back({center - up - side, normal, {}});
+        verts_.push_back({center + up - side, normal, {}});
+        verts_.push_back({center + up + side, normal, {}});
+
+        verts_.push_back({center + up + side, normal, {}});
+        verts_.push_back({center - up + side, normal, {}});
+        verts_.push_back({center - up - side, normal, {}});
+    }
+
+    using vertex = std::tuple<glm::vec3, glm::vec3, glm::vec2>; // position, normal, texuv
+    std::vector<vertex> verts_;
+    gl::geometry geometry_;
+};
 
 class StripGeometry
 {
@@ -170,24 +205,27 @@ private:
     gl::geometry geometry_;
 };
 
-class demo
+class Demo
 {
 public:
-    demo(int window_width, int window_height)
+    Demo(int window_width, int window_height)
         : window_width_(window_width)
         , window_height_(window_height)
+        , plane_(new PlaneGeometry(glm::vec3(0, 0, -1), glm::vec3(3, 0, 0), glm::vec3(0, 3, 0)))
+        , shadow_buffer_(ShadowWidth, ShadowHeight)
     {
         initialize_shader();
 
         for (int i = 0; i < NumStrips; ++i)
         {
             const float a = static_cast<float>(i) * 2.0f * M_PI / NumStrips;
-            const auto coil_radius = 0.1f + frand() * 0.1f;
+            const auto coil_radius = 0.05f + frand() * 0.05f;
             strips_.emplace_back(new StripGeometry(a, coil_radius));
 
             auto &params = params_[i];
-            params.speed = 0.1f + frand() * 0.3f;
-            params.length = 02.f + frand() * 0.4f;
+            params.offset = frand();
+            params.speed = /* 0.1f + frand() * 0.3f */ static_cast<float>(1 + rand() % 2) / CycleDuration;
+            params.length = 03.f + frand() * 0.4f;
             params.color = glm::vec3(frand(), frand(), frand()) * 0.5f + glm::vec3(0.5f);
             // this sucks
         }
@@ -195,86 +233,141 @@ public:
 
     void render_and_step(float dt)
     {
-        render(program_);
+        render();
         cur_time_ += dt;
     }
 
 private:
     void initialize_shader()
     {
+        shadow_program_.add_shader(GL_VERTEX_SHADER, "shaders/shadow.vert");
+        shadow_program_.add_shader(GL_FRAGMENT_SHADER, "shaders/shadow.frag");
+        shadow_program_.link();
+
         program_.add_shader(GL_VERTEX_SHADER, "shaders/sphere.vert");
         program_.add_shader(GL_FRAGMENT_SHADER, "shaders/sphere.frag");
         program_.link();
     }
 
-    void render(const gl::shader_program &program) const
+    void render() const
     {
+        const auto light_position = glm::vec3(0, 0, 3);
+
+#if 0
+        const float angle = 0.3f * cosf(cur_time_ * 2.f * M_PI / CycleDuration);
+        const auto model = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0, 1, 0));
+#else
+        const auto model = glm::mat4(1.0);
+#endif
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        glDisable(GL_CULL_FACE);
+
+        // shadow buffer
+
+        glViewport(0, 0, ShadowWidth, ShadowHeight);
+        shadow_buffer_.bind();
+
+        glClear(GL_DEPTH_BUFFER_BIT);
+
+        const auto light_projection =
+                // glm::perspective(glm::radians(45.0f), static_cast<float>(ShadowWidth) / ShadowHeight, 0.1f, 100.f);
+                glm::ortho(-5.0f, 5.0f, -5.0f, 5.0f, 1.0f, 12.5f);
+        const auto light_view = glm::lookAt(light_position, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+
+        shadow_program_.bind();
+        shadow_program_.set_uniform("viewMatrix", light_view);
+        shadow_program_.set_uniform("projectionMatrix", light_projection);
+        shadow_program_.set_uniform("modelMatrix", model);
+
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(4, 4);
+        render_strips(shadow_program_, true);
+        glDisable(GL_POLYGON_OFFSET_FILL);
+
+        shadow_buffer_.unbind();
+
+        // scene
+
         glViewport(0, 0, window_width_, window_height_);
         glClearColor(0.75, 0.75, 0.75, 0);
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glEnable(GL_MULTISAMPLE);
-
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LESS);
 
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-        glEnable(GL_CULL_FACE);
-
         const auto projection =
                 glm::perspective(glm::radians(45.0f), static_cast<float>(window_width_) / window_height_, 0.1f, 100.f);
-        const auto view_pos = glm::vec3(0, 0, 3);
-        const auto view_up = glm::vec3(0, 1, 0);
-        const auto view = glm::lookAt(view_pos, glm::vec3(0, 0, 0), view_up);
-
-#if 1
-        const float angle = 0.3f * cosf(cur_time_ * 2.f * M_PI / CycleDuration);
-        const auto model = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0, 1, 0));
-#else
-        const auto model = glm::identity<glm::mat4x4>();
-#endif
+        const auto view = glm::lookAt(glm::vec3(0, 0, 3), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
         const auto mvp = projection * view * model;
 
-        glm::mat3 model_normal(model);
-        model_normal = glm::inverse(model_normal);
-        model_normal = glm::transpose(model_normal);
+        shadow_buffer_.bind_texture();
 
-        program.bind();
-        program.set_uniform("mvp", mvp);
-        program.set_uniform("modelMatrix", model);
-        program.set_uniform("lightPosition", glm::vec3(5, -5, 5));
+        program_.bind();
+        program_.set_uniform("mvp", mvp);
+        program_.set_uniform("modelMatrix", model);
+        program_.set_uniform("lightPosition", light_position);
+        program_.set_uniform("lightViewProjection", light_projection * light_view);
+        program_.set_uniform("shadowMapTexture", 0);
+
+        render_strips(program_, false);
+    }
+
+    void render_strips(const gl::shader_program &program, bool shadow) const
+    {
+        if (!shadow)
+        {
+            program.set_uniform("color", glm::vec3(0.75));
+            program.set_uniform("vRange", glm::vec2(0, 1));
+        }
+        plane_->render();
 
         for (int i = 0; i < strips_.size(); ++i)
         {
             const auto &params = params_[i];
 
-            program.set_uniform("color", params.color);
+            if (!shadow)
+            {
+                program.set_uniform("color", params.color);
+            }
 
-            auto v_start = fmod(cur_time_ * params.speed, 1.0f);
+#if 1
+            auto v_start = fmod(params.offset + cur_time_ * params.speed, 1.0f);
             auto v_end = fmod(v_start + params.length, 1.0f);
+#else
+            auto v_start = 0.8f;
+            auto v_end = 0.2f;
+#endif
             program.set_uniform("vRange", glm::vec2(v_start, v_end));
 
             strips_[i]->render();
         }
     }
 
-    static constexpr auto NumStrips = 1;
+    static constexpr auto NumStrips = 20;
+
+    static constexpr auto ShadowWidth = 1024;
+    static constexpr auto ShadowHeight = ShadowWidth;
 
     int window_width_;
     int window_height_;
     float cur_time_ = 0;
     gl::shader_program program_;
+    gl::shader_program shadow_program_;
     std::vector<std::unique_ptr<StripGeometry>> strips_;
+    std::unique_ptr<PlaneGeometry> plane_;
     struct StripParams
     {
         glm::vec3 color;
+        float offset;
         float speed;
         float length;
     };
     std::array<StripParams, NumStrips> params_;
+    gl::shadow_buffer shadow_buffer_;
 };
 
 int main()
@@ -295,7 +388,7 @@ int main()
 #endif
 
     {
-        demo d(window_width, window_height);
+        Demo d(window_width, window_height);
 
 #ifndef DUMP_FRAMES
         double curTime = glfwGetTime();
