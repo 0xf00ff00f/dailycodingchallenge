@@ -36,7 +36,7 @@ float shadowFactor()
     }
     factor /= ((range * 2 + 1) * (range * 2 + 1));
 #endif
-    return min(factor + 0.75, 1.0);
+    return min(factor + 0.5, 1.0);
 }
 
 void main(void)
@@ -44,27 +44,35 @@ void main(void)
     float vStart = vRange.x;
     float vEnd = vRange.y;
     float alpha = 0.0;
-    const float border = 0.01;
-    if (vEnd > vStart)
+    const float border = 0.005;
+    if (vStart.x != -1)
     {
-        if (vs_uv.y < vStart || vs_uv.y > vEnd)
-            discard;
-        alpha = smoothstep(vStart, vStart + border, vs_uv.y) * (1.0 - smoothstep(vEnd - border, vEnd, vs_uv.y));
+        if (vEnd > vStart)
+        {
+            if (vs_uv.y < vStart || vs_uv.y > vEnd)
+                discard;
+            alpha = smoothstep(vStart, vStart + border, vs_uv.y) * (1.0 - smoothstep(vEnd - border, vEnd, vs_uv.y));
+        }
+        else
+        {
+            if (vs_uv.y > vEnd && vs_uv.y < vStart)
+                discard;
+            alpha = smoothstep(vStart, vStart + border, vs_uv.y) + (1.0 - smoothstep(vEnd - border, vEnd, vs_uv.y));
+        }
     }
     else
     {
-        if (vs_uv.y > vEnd && vs_uv.y < vStart)
-            discard;
-        alpha = smoothstep(vStart, vStart + border, vs_uv.y) + (1.0 - smoothstep(vEnd - border, vEnd, vs_uv.y));
+        alpha = 1.0;
     }
 
-    float intensity = max(dot(vs_normal, normalize(lightPosition - vs_position)), 0.0);
+    // float intensity = max(dot(vs_normal, normalize(lightPosition - vs_position)), 0.0);
+    float intensity = abs(dot(vs_normal, normalize(lightPosition - vs_position)));
 
     float u = fract(128.0 * (vs_uv.y + vStart) + vs_uv.x);
     if (u > 0.8 || vs_uv.x < .1 || vs_uv.x > .9)
         intensity *= 0.75;
 
-    // intensity *= shadowFactor();
+    intensity *= shadowFactor();
 
     fragColor = vec4(intensity * color, alpha);
 }

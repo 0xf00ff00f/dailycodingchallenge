@@ -149,7 +149,7 @@ private:
             subdivide(control_points, v0, v1, 1);
         }
 
-        std::vector<glm::vec3> path_points;
+        std::vector<std::tuple<glm::vec3, glm::vec3>> path_points; // position, normal
 
         const auto num_control_points = control_points.size();
         for (int i = 0; i < num_control_points; ++i)
@@ -177,18 +177,18 @@ private:
 
                 // there's probably a cleaner way to do this with matrices but screw it
                 const auto r = p + (std::cos(a) * s + std::sin(a) * n) * coil_radius;
-                path_points.push_back(r);
+                path_points.emplace_back(r, glm::normalize(r - p));
             }
         }
 
         const auto num_path_points = path_points.size();
         for (int i = 0; i <= num_path_points; ++i)
         {
-            const auto &v0 = path_points[i % num_path_points];
-            const auto &v1 = path_points[(i + 1) % num_path_points];
+            const auto &[v0, n0] = path_points[i % num_path_points];
+            const auto &[v1, n1] = path_points[(i + 1) % num_path_points];
 
             const auto d = glm::normalize(v1 - v0);
-            const auto s = glm::cross(d, glm::vec3(0, 0, 1));
+            const auto s = glm::cross(d, n0);
             const auto n = glm::cross(s, d);
 
             const auto t = static_cast<float>(i) / num_path_points;
@@ -251,7 +251,7 @@ private:
 
     void render() const
     {
-        const auto light_position = glm::vec3(0, 0, 3);
+        const auto light_position = glm::vec3(-1, -1, 3);
 
 #if 0
         const float angle = 0.3f * cosf(cur_time_ * 2.f * M_PI / CycleDuration);
@@ -273,8 +273,8 @@ private:
         glClear(GL_DEPTH_BUFFER_BIT);
 
         const auto light_projection =
-                // glm::perspective(glm::radians(45.0f), static_cast<float>(ShadowWidth) / ShadowHeight, 0.1f, 100.f);
-                glm::ortho(-5.0f, 5.0f, -5.0f, 5.0f, 1.0f, 12.5f);
+                glm::perspective(glm::radians(45.0f), static_cast<float>(ShadowWidth) / ShadowHeight, 0.1f, 100.f);
+                // glm::ortho(-5.0f, 5.0f, -5.0f, 5.0f, 1.0f, 12.5f);
         const auto light_view = glm::lookAt(light_position, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
 
         shadow_program_.bind();
@@ -318,21 +318,19 @@ private:
 
     void render_strips(const gl::shader_program &program, bool shadow) const
     {
+#if 0
         if (!shadow)
-        {
             program.set_uniform("color", glm::vec3(0.75));
-            program.set_uniform("vRange", glm::vec2(0, 1));
-        }
+        program.set_uniform("vRange", glm::vec2(-1, -1));
         plane_->render();
+#endif
 
         for (int i = 0; i < strips_.size(); ++i)
         {
             const auto &params = params_[i];
 
             if (!shadow)
-            {
                 program.set_uniform("color", params.color);
-            }
 
 #if 1
             auto v_start = fmod(params.offset + cur_time_ * params.speed, 1.0f);
@@ -347,9 +345,9 @@ private:
         }
     }
 
-    static constexpr auto NumStrips = 20;
+    static constexpr auto NumStrips = 40;
 
-    static constexpr auto ShadowWidth = 1024;
+    static constexpr auto ShadowWidth = 2048;
     static constexpr auto ShadowHeight = ShadowWidth;
 
     int window_width_;

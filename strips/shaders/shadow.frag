@@ -8,14 +8,17 @@ void main()
 {
     float vStart = vRange.x;
     float vEnd = vRange.y;
-    if (vEnd > vStart)
+    if (vStart.x != -1)
     {
-        if (vs_uv.y < vStart || vs_uv.y > vEnd)
-            discard;
-    }
-    else
-    {
-        if (vs_uv.y > vEnd && vs_uv.y < vStart)
-            discard;
+        if (vEnd > vStart)
+        {
+            if (vs_uv.y < vStart || vs_uv.y > vEnd)
+                discard;
+        }
+        else
+        {
+            if (vs_uv.y > vEnd && vs_uv.y < vStart)
+                discard;
+        }
     }
 }
