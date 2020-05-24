@@ -4,11 +4,21 @@ layout(lines) in;
 layout(triangle_strip, max_vertices=7) out;
 
 uniform mat4 viewProjectionMatrix;
-uniform mat4 modelMatrix;
-uniform float height;
 uniform mat4 lightViewProjection;
 
+struct State
+{
+    mat4 transform;
+    float height;
+};
+
+layout(std430, binding=0) buffer States
+{
+    State states[];
+};
+
 in vec2 vs_position[];
+in int vs_instanceID[];
 
 out vec3 gs_position;
 out vec3 gs_normal;
@@ -16,6 +26,10 @@ out vec4 gs_positionInLightSpace;
 
 void main(void)
 {
+    int tileInstance = vs_instanceID[0];
+    float height = states[tileInstance].height;
+    mat4 modelMatrix = states[tileInstance].transform;
+
     const mat4 shadowMatrix = mat4(0.5, 0.0, 0.0, 0.0,
                                    0.0, 0.5, 0.0, 0.0,
                                    0.0, 0.0, 0.5, 0.0,

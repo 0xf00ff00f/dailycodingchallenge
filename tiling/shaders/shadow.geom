@@ -4,13 +4,27 @@ layout(lines) in;
 layout(triangle_strip, max_vertices=5) out;
 
 uniform mat4 viewProjectionMatrix;
-uniform mat4 modelMatrix;
-uniform float height;
+
+struct State
+{
+    mat4 transform;
+    float height;
+};
+
+layout(std430, binding=0) buffer States
+{
+    State states[];
+};
 
 in vec2 vs_position[];
+in int vs_instanceID[];
 
 void main(void)
 {
+    int tileInstance = vs_instanceID[0];
+    float height = states[tileInstance].height;
+    mat4 modelMatrix = states[tileInstance].transform;
+
     mat4 mvp = viewProjectionMatrix * modelMatrix;
 
     vec2 v0 = 0.99 * vs_position[0];

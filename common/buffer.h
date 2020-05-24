@@ -16,7 +16,7 @@ public:
         glGenBuffers(1, &id_);
 
         bind();
-        glBufferData(target_, size * sizeof(T), data, GL_STATIC_DRAW);
+        glBufferData(target_, size * sizeof(T), data, GL_DYNAMIC_DRAW);
     }
 
     buffer(GLenum target, size_t size)

@@ -6,6 +6,7 @@
 #include "shadow_buffer.h"
 #include "util.h"
 #include "tween.h"
+#include "buffer.h"
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -37,6 +38,8 @@ public:
         : window_width_(window_width)
         , window_height_(window_height)
         , shadow_buffer_(ShadowWidth, ShadowHeight)
+        , hexagon_states_(GL_SHADER_STORAGE_BUFFER, GridRows * GridColumns)
+        , diamond_states_(GL_SHADER_STORAGE_BUFFER, (GridRows - 1) * (GridColumns - 1))
     {
         initialize_shader();
         initialize_geometry();
@@ -111,15 +114,17 @@ private:
             glm::rotate(glm::mat4(1.0f), static_cast<float>(0.25 * M_PI), glm::vec3(0, 0, 1)) *
             glm::translate(glm::mat4(1.0f), glm::vec3(-x_offset, 0, 0));
 
+        update_buffers(model, x_offset);
+
         // shadow
+
+        const auto light_projection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 1.0f, 50.0f);
+        const auto light_view = glm::lookAt(light_position, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
 
         glViewport(0, 0, ShadowWidth, ShadowHeight);
         shadow_buffer_.bind();
 
         glClear(GL_DEPTH_BUFFER_BIT);
-
-        const auto light_projection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 1.0f, 50.0f);
-        const auto light_view = glm::lookAt(light_position, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
 
         shadow_program_.bind();
         shadow_program_.set_uniform("viewProjectionMatrix", light_projection * light_view);
@@ -156,10 +161,9 @@ private:
         draw_grid(program_, model, x_offset);
     }
 
-    void draw_grid(const gl::shader_program &program, const glm::mat4 &model, float x_offset) const
+    void update_buffers(const glm::mat4 &model, float x_offset) const
     {
         const auto cos_30 = std::cos(M_PI / 6.0);
-
         constexpr const auto StepHeight = 3.0;
 
         const auto tile_height = [cos_30, &model, x_offset](float x, float drop_start) -> float {
@@ -198,39 +202,50 @@ private:
 
         // hexagons
 
-        hexagon_.bind();
-        for (int i = 0; i < GridRows; ++i) {
-            for (int j = 0; j < GridColumns; ++j) {
-                const auto x = 2.0 * cos_30 * (j - (0.5 * (GridColumns - 1)));
-                const auto y = 2.0 * (i - 0.5 * (GridRows - 1));
-
-                const auto t = glm::translate(glm::mat4(1.0), glm::vec3(x, y, 0));
-                program.set_uniform("modelMatrix", model * t);
-
-                const float height = tile_height(x, hexagon_heights_[i]);
-                program.set_uniform("height", height);
-
-                glDrawArrays(GL_LINE_LOOP, 0, 6);
+        {
+            auto *state = hexagon_states_.map();
+            for (int i = 0; i < GridRows; ++i) {
+                for (int j = 0; j < GridColumns; ++j) {
+                    const auto x = 2.0 * cos_30 * (j - (0.5 * (GridColumns - 1)));
+                    const auto y = 2.0 * (i - 0.5 * (GridRows - 1));
+                    const auto t = glm::translate(glm::mat4(1.0), glm::vec3(x, y, 0));
+                    state->transform = model * t;
+                    state->height = tile_height(x, hexagon_heights_[i]);
+                    ++state;
+                }
             }
+            hexagon_states_.unmap();
         }
 
         // diamonds
 
-        diamond_.bind();
-        for (int i = 0; i < GridRows - 1; ++i) {
-            for (int j = 0; j < GridColumns - 1; ++j) {
-                const auto x = 2.0 * cos_30 * (j - (0.5 * (GridColumns - 2)));
-                const auto y = 2.0 * (i - 0.5 * (GridRows - 2));
-
-                const auto t = glm::translate(glm::mat4(1.0), glm::vec3(x, y, 0));
-                program.set_uniform("modelMatrix", model * t);
-
-                const float height = tile_height(x, diamond_heights_[i]);
-                program.set_uniform("height", height);
-
-                glDrawArrays(GL_LINE_LOOP, 0, 4);
+        {
+            auto *state = diamond_states_.map();
+            for (int i = 0; i < GridRows - 1; ++i) {
+                for (int j = 0; j < GridColumns - 1; ++j) {
+                    const auto x = 2.0 * cos_30 * (j - (0.5 * (GridColumns - 2)));
+                    const auto y = 2.0 * (i - 0.5 * (GridRows - 2));
+                    const auto t = glm::translate(glm::mat4(1.0), glm::vec3(x, y, 0));
+                    state->transform = model * t;
+                    state->height = tile_height(x, diamond_heights_[i]);
+                    ++state;
+                }
             }
+            diamond_states_.unmap();
         }
+    }
+
+    void draw_grid(const gl::shader_program &program, const glm::mat4 &model, float x_offset) const
+    {
+        // hexagons
+        hexagon_.bind();
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, hexagon_states_.handle());
+        glDrawArraysInstanced(GL_LINE_LOOP, 0, 6, GridRows * GridColumns);
+
+        // diamonds
+        diamond_.bind();
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, diamond_states_.handle());
+        glDrawArraysInstanced(GL_LINE_LOOP, 0, 4, (GridRows - 1) * (GridColumns - 1));
     }
 
     static constexpr auto NumStrips = 3;
@@ -253,6 +268,13 @@ private:
     gl::geometry hexagon_;
     gl::geometry diamond_;
     gl::shadow_buffer shadow_buffer_;
+    struct TileState {
+        glm::mat4 transform;
+        float height;
+        float padding[3];
+    };
+    gl::buffer<TileState> hexagon_states_;
+    gl::buffer<TileState> diamond_states_;
 };
 
 int main()
