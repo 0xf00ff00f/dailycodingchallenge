@@ -102,7 +102,6 @@ private:
     void render() const
     {
         glDisable(GL_BLEND);
-        glDisable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LESS);
 
@@ -132,6 +131,7 @@ private:
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(4, 4);
 
+        glDisable(GL_CULL_FACE);
         draw_grid(shadow_program_, model, x_offset);
 
         glDisable(GL_POLYGON_OFFSET_FILL);
@@ -158,6 +158,7 @@ private:
         program_.set_uniform("lightViewProjection", light_projection * light_view);
         program_.set_uniform("shadowMapTexture", 0);
 
+        glEnable(GL_CULL_FACE);
         draw_grid(program_, model, x_offset);
     }
 
@@ -254,7 +255,7 @@ private:
     static constexpr auto ShadowHeight = ShadowWidth;
 
     static constexpr auto GridRows = 12;
-    static constexpr auto GridColumns = 14;
+    static constexpr auto GridColumns = 15;
 
     std::array<float, GridRows> hexagon_heights_;
     std::array<float, GridRows - 1> diamond_heights_;
