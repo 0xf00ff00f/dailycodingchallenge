@@ -3,6 +3,7 @@
 #include "window.h"
 #include "geometry.h"
 #include "shader_program.h"
+#include "shadow_buffer.h"
 #include "util.h"
 
 #include <GL/glew.h>
@@ -34,6 +35,7 @@ public:
     Demo(int window_width, int window_height)
         : window_width_(window_width)
         , window_height_(window_height)
+        , shadow_buffer_(ShadowWidth, ShadowHeight)
     {
         initialize_shader();
         initialize_geometry();
@@ -49,6 +51,11 @@ public:
 private:
     void initialize_shader()
     {
+        shadow_program_.add_shader(GL_VERTEX_SHADER, "shaders/shadow.vert");
+        shadow_program_.add_shader(GL_GEOMETRY_SHADER, "shaders/shadow.geom");
+        shadow_program_.add_shader(GL_FRAGMENT_SHADER, "shaders/shadow.frag");
+        shadow_program_.link();
+
         program_.add_shader(GL_VERTEX_SHADER, "shaders/tile.vert");
         program_.add_shader(GL_GEOMETRY_SHADER, "shaders/tile.geom");
         program_.add_shader(GL_FRAGMENT_SHADER, "shaders/tile.frag");
@@ -91,17 +98,35 @@ private:
 
     void render() const
     {
-        const auto light_position = glm::vec3(-6, -6, 15);
-
-#if 0
-        const float angle = -cur_time_ * 2.f * M_PI / CycleDuration;
-        const auto model = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0, 0, 1));
-#else
+        const auto light_position = glm::vec3(-6, -12, 15);
         const auto model = glm::rotate(glm::mat4(1.0f), static_cast<float>(0.25 * M_PI), glm::vec3(0, 0, 1));
-#endif
 
         glDisable(GL_BLEND);
         glDisable(GL_CULL_FACE);
+        glEnable(GL_MULTISAMPLE);
+
+        // shadow
+
+        glViewport(0, 0, ShadowWidth, ShadowHeight);
+        shadow_buffer_.bind();
+
+        glClear(GL_DEPTH_BUFFER_BIT);
+
+        const auto light_projection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 1.0f, 50.0f);
+        const auto light_view = glm::lookAt(light_position, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+
+        shadow_program_.bind();
+        shadow_program_.set_uniform("viewProjectionMatrix", light_projection * light_view);
+
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(4, 4);
+
+        draw_grid(program_, model);
+
+        glDisable(GL_POLYGON_OFFSET_FILL);
+        shadow_buffer_.unbind();
+
+        // render
 
         glViewport(0, 0, window_width_, window_height_);
         glClearColor(0, 0, 0, 0);
@@ -117,10 +142,14 @@ private:
         const auto look_at = glm::vec3(0, 0, 0);
         const auto view = glm::lookAt(camera_position, look_at, glm::vec3(0, 1, 0));
 
+        shadow_buffer_.bind_texture();
+
         program_.bind();
         program_.set_uniform("viewProjectionMatrix", projection * view);
         program_.set_uniform("lightPosition", light_position);
         program_.set_uniform("color", glm::vec3(1.0));
+        program_.set_uniform("lightViewProjection", light_projection * light_view);
+        program_.set_uniform("shadowMapTexture", 0);
 
         draw_grid(program_, model);
     }
@@ -139,7 +168,9 @@ private:
 
                 const auto t = glm::translate(glm::mat4(1.0), glm::vec3(x, y, 0));
                 program_.set_uniform("modelMatrix", model * t);
-                program_.set_uniform("height", diamond_heights_[i][j]);
+
+                const float height = 2.5f * (1.0f + std::sin(cur_time_ + hexagon_heights_[i][j]));
+                program_.set_uniform("height", height);
 
                 glDrawArrays(GL_LINE_LOOP, 0, 6);
             }
@@ -155,7 +186,9 @@ private:
 
                 const auto t = glm::translate(glm::mat4(1.0), glm::vec3(x, y, 0));
                 program_.set_uniform("modelMatrix", model * t);
-                program_.set_uniform("height", hexagon_heights_[i][j]);
+
+                const float height = 2.5f * (1.0f + std::sin(cur_time_ + diamond_heights_[i][j]));
+                program_.set_uniform("height", height);
 
                 glDrawArrays(GL_LINE_LOOP, 0, 4);
             }
@@ -177,9 +210,11 @@ private:
     int window_height_;
     float cur_time_ = 0;
     gl::shader_program program_;
+    gl::shader_program shadow_program_;
     using Vertex = std::tuple<glm::vec2>;
     gl::geometry hexagon_;
     gl::geometry diamond_;
+    gl::shadow_buffer shadow_buffer_;
 };
 
 int main()

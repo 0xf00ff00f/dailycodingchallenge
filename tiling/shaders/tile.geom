@@ -6,14 +6,21 @@ layout(triangle_strip, max_vertices=7) out;
 uniform mat4 viewProjectionMatrix;
 uniform mat4 modelMatrix;
 uniform float height;
+uniform mat4 lightViewProjection;
 
 in vec2 vs_position[];
 
 out vec3 gs_position;
 out vec3 gs_normal;
+out vec4 gs_positionInLightSpace;
 
 void main(void)
 {
+    const mat4 shadowMatrix = mat4(0.5, 0.0, 0.0, 0.0,
+                                   0.0, 0.5, 0.0, 0.0,
+                                   0.0, 0.0, 0.5, 0.0,
+                                   0.5, 0.5, 0.5, 1.0);
+
     mat3 normalMatrix = mat3(modelMatrix);
     mat4 mvp = viewProjectionMatrix * modelMatrix;
 
@@ -31,36 +38,43 @@ void main(void)
     vec4 p4 = vec4(0.0, 0.0, height, 1.0);
 
     gs_position = vec3(modelMatrix * p0);
+	gs_positionInLightSpace = shadowMatrix * lightViewProjection * modelMatrix * p0;
     gs_normal = side_normal;
     gl_Position = mvp * p0;
     EmitVertex();
 
     gs_position = vec3(modelMatrix * p1);
+	gs_positionInLightSpace = shadowMatrix * lightViewProjection * modelMatrix * p1;
     gs_normal = side_normal;
     gl_Position = mvp * p1;
     EmitVertex();
 
     gs_position = vec3(modelMatrix * p2);
+	gs_positionInLightSpace = shadowMatrix * lightViewProjection * modelMatrix * p2;
     gs_normal = side_normal;
     gl_Position = mvp * p2;
     EmitVertex();
 
     gs_position = vec3(modelMatrix * p3);
+	gs_positionInLightSpace = shadowMatrix * lightViewProjection * modelMatrix * p3;
     gs_normal = side_normal;
     gl_Position = mvp * p3;
     EmitVertex();
 
     gs_position = vec3(modelMatrix * p2);
+	gs_positionInLightSpace = shadowMatrix * lightViewProjection * modelMatrix * p2;
     gs_normal = up_normal;
     gl_Position = mvp * p2;
     EmitVertex();
 
     gs_position = vec3(modelMatrix * p3);
+	gs_positionInLightSpace = shadowMatrix * lightViewProjection * modelMatrix * p3;
     gs_normal = up_normal;
     gl_Position = mvp * p3;
     EmitVertex();
 
     gs_position = vec3(modelMatrix * p4);
+	gs_positionInLightSpace = shadowMatrix * lightViewProjection * modelMatrix * p4;
     gs_normal = up_normal;
     gl_Position = mvp * p4;
     EmitVertex();
