@@ -28,46 +28,16 @@ constexpr const auto FramesPerSecond = 40;
 constexpr const auto FramesPerSecond = 60;
 #endif
 
-class TileGeometry
-{
-public:
-    TileGeometry()
-    {
-        initialize();
-        geometry_.set_data(verts_);
-    }
-
-    void render() const
-    {
-        geometry_.bind();
-        glDrawArrays(GL_LINE_LOOP, 0, verts_.size());
-    }
-
-private:
-    void initialize()
-    {
-        constexpr auto NumSides = 6;
-        for (int i = 0; i < NumSides; ++i)
-        {
-            const float a = static_cast<float>(i) * 2.0 * M_PI / NumSides;
-            verts_.emplace_back(glm::vec2(std::cos(a), std::sin(a)));
-        }
-    }
-
-    using vertex = std::tuple<glm::vec2>;
-    std::vector<vertex> verts_;
-    gl::geometry geometry_;
-};
-
 class Demo
 {
 public:
     Demo(int window_width, int window_height)
         : window_width_(window_width)
         , window_height_(window_height)
-        , tile_(new TileGeometry)
     {
         initialize_shader();
+        initialize_geometry();
+        initialize_heights();
     }
 
     void render_and_step(float dt)
@@ -85,15 +55,49 @@ private:
         program_.link();
     }
 
+    void initialize_geometry()
+    {
+        const auto cos_30 = std::cos(M_PI / 6.0);
+
+        static const std::vector<Vertex> hexagon_verts = {
+            { glm::vec2(cos_30, 0.5) },
+            { glm::vec2(0, 1) },
+            { glm::vec2(-cos_30, 0.5) },
+            { glm::vec2(-cos_30, -0.5) },
+            { glm::vec2(0, -1) },
+            { glm::vec2(cos_30, -0.5) },
+        };
+        hexagon_.set_data(hexagon_verts);
+
+        static const std::vector<Vertex> diamond_verts = {
+            { glm::vec2(cos_30, 0.0) },
+            { glm::vec2(0.0, 0.5) },
+            { glm::vec2(-cos_30, 0.0) },
+            { glm::vec2(0.0, -0.5) }
+        };
+        diamond_.set_data(diamond_verts);
+    }
+
+    void initialize_heights()
+    {
+        for (int i = 0; i < GridRows; ++i)
+            for (int j = 0; j < GridColumns; ++j)
+                hexagon_heights_[i][j] = 2.5 * static_cast<float>(std::rand()) / RAND_MAX;
+
+        for (int i = 0; i < GridRows - 1; ++i)
+            for (int j = 0; j < GridColumns - 1; ++j)
+                diamond_heights_[i][j] = 2.5 * static_cast<float>(std::rand()) / RAND_MAX;
+    }
+
     void render() const
     {
-        const auto light_position = glm::vec3(-3, -3, 7);
+        const auto light_position = glm::vec3(-6, -6, 15);
 
 #if 0
         const float angle = -cur_time_ * 2.f * M_PI / CycleDuration;
-        const auto model = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(1, 0, 0));
+        const auto model = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0, 0, 1));
 #else
-        const auto model = glm::mat4(1.0);
+        const auto model = glm::rotate(glm::mat4(1.0f), static_cast<float>(0.25 * M_PI), glm::vec3(0, 0, 1));
 #endif
 
         glDisable(GL_BLEND);
@@ -109,17 +113,53 @@ private:
 
         const auto projection =
                 glm::perspective(glm::radians(45.0f), static_cast<float>(window_width_) / window_height_, 0.1f, 100.f);
-        const auto view = glm::lookAt(glm::vec3(-4, -4, 7), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-        const auto mvp = projection * view * model;
+        const auto camera_position = /* glm::vec3(0, 0, 7); */ glm::vec3(0, -6, 12);
+        const auto look_at = glm::vec3(0, 0, 0);
+        const auto view = glm::lookAt(camera_position, look_at, glm::vec3(0, 1, 0));
 
         program_.bind();
-        program_.set_uniform("mvp", mvp);
-        program_.set_uniform("modelMatrix", model);
+        program_.set_uniform("viewProjectionMatrix", projection * view);
         program_.set_uniform("lightPosition", light_position);
         program_.set_uniform("color", glm::vec3(1.0));
-        program_.set_uniform("height", static_cast<float>(2.0 + 0.5 * glm::sin(2.0 * cur_time_)));
 
-        tile_->render();
+        draw_grid(program_, model);
+    }
+
+    void draw_grid(const gl::shader_program &program, const glm::mat4 &model) const
+    {
+        const auto cos_30 = std::cos(M_PI / 6.0);
+
+        // hexagons
+
+        hexagon_.bind();
+        for (int i = 0; i < GridRows; ++i) {
+            for (int j = 0; j < GridColumns; ++j) {
+                const auto x = 2.0 * cos_30 * (j - (0.5 * (GridColumns - 1)));
+                const auto y = 2.0 * (i - 0.5 * (GridRows - 1));
+
+                const auto t = glm::translate(glm::mat4(1.0), glm::vec3(x, y, 0));
+                program_.set_uniform("modelMatrix", model * t);
+                program_.set_uniform("height", diamond_heights_[i][j]);
+
+                glDrawArrays(GL_LINE_LOOP, 0, 6);
+            }
+        }
+
+        // diamonds
+
+        diamond_.bind();
+        for (int i = 0; i < GridRows - 1; ++i) {
+            for (int j = 0; j < GridColumns - 1; ++j) {
+                const auto x = 2.0 * cos_30 * (j - (0.5 * (GridColumns - 2)));
+                const auto y = 2.0 * (i - 0.5 * (GridRows - 2));
+
+                const auto t = glm::translate(glm::mat4(1.0), glm::vec3(x, y, 0));
+                program_.set_uniform("modelMatrix", model * t);
+                program_.set_uniform("height", hexagon_heights_[i][j]);
+
+                glDrawArrays(GL_LINE_LOOP, 0, 4);
+            }
+        }
     }
 
     static constexpr auto NumStrips = 3;
@@ -127,11 +167,19 @@ private:
     static constexpr auto ShadowWidth = 2048;
     static constexpr auto ShadowHeight = ShadowWidth;
 
+    static constexpr auto GridRows = 12;
+    static constexpr auto GridColumns = 12;
+
+    std::array<std::array<float, GridColumns>, GridRows> hexagon_heights_;
+    std::array<std::array<float, GridColumns - 1>, GridRows - 1> diamond_heights_;
+
     int window_width_;
     int window_height_;
     float cur_time_ = 0;
     gl::shader_program program_;
-    std::unique_ptr<TileGeometry> tile_;
+    using Vertex = std::tuple<glm::vec2>;
+    gl::geometry hexagon_;
+    gl::geometry diamond_;
 };
 
 int main()

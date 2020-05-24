@@ -3,7 +3,7 @@
 layout(lines) in;
 layout(triangle_strip, max_vertices=7) out;
 
-uniform mat4 mvp;
+uniform mat4 viewProjectionMatrix;
 uniform mat4 modelMatrix;
 uniform float height;
 
@@ -15,15 +15,19 @@ out vec3 gs_normal;
 void main(void)
 {
     mat3 normalMatrix = mat3(modelMatrix);
+    mat4 mvp = viewProjectionMatrix * modelMatrix;
 
     vec2 d = vs_position[0] - vs_position[1];
     vec3 side_normal = normalMatrix * normalize(vec3(-d.y, d.x, 0.0));
     vec3 up_normal = normalMatrix * vec3(0.0, 0.0, 1.0);
 
-    vec4 p0 = vec4(vs_position[0], 0.0, 1.0);
-    vec4 p1 = vec4(vs_position[1], 0.0, 1.0);
-    vec4 p2 = vec4(vs_position[0], height, 1.0);
-    vec4 p3 = vec4(vs_position[1], height, 1.0);
+    vec2 v0 = 0.98 * vs_position[0];
+    vec2 v1 = 0.98 * vs_position[1];
+
+    vec4 p0 = vec4(v0, 0.0, 1.0);
+    vec4 p1 = vec4(v1, 0.0, 1.0);
+    vec4 p2 = vec4(v0, height, 1.0);
+    vec4 p3 = vec4(v1, height, 1.0);
     vec4 p4 = vec4(0.0, 0.0, height, 1.0);
 
     gs_position = vec3(modelMatrix * p0);
