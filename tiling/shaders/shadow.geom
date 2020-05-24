@@ -13,8 +13,8 @@ void main(void)
 {
     mat4 mvp = viewProjectionMatrix * modelMatrix;
 
-    vec2 v0 = 0.98 * vs_position[0];
-    vec2 v1 = 0.98 * vs_position[1];
+    vec2 v0 = 0.99 * vs_position[0];
+    vec2 v1 = 0.99 * vs_position[1];
 
     vec4 p0 = vec4(v0, 0.0, 1.0);
     vec4 p1 = vec4(v1, 0.0, 1.0);

@@ -5,6 +5,7 @@
 #include "shader_program.h"
 #include "shadow_buffer.h"
 #include "util.h"
+#include "tween.h"
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -87,23 +88,28 @@ private:
 
     void initialize_heights()
     {
-        for (int i = 0; i < GridRows; ++i)
-            for (int j = 0; j < GridColumns; ++j)
-                hexagon_heights_[i][j] = 2.5 * static_cast<float>(std::rand()) / RAND_MAX;
-
-        for (int i = 0; i < GridRows - 1; ++i)
-            for (int j = 0; j < GridColumns - 1; ++j)
-                diamond_heights_[i][j] = 2.5 * static_cast<float>(std::rand()) / RAND_MAX;
+        std::generate(hexagon_heights_.begin(), hexagon_heights_.end(), [] {
+            return static_cast<float>(std::rand()) / RAND_MAX;
+        });
+        std::generate(diamond_heights_.begin(), diamond_heights_.end(), [] {
+            return static_cast<float>(std::rand()) / RAND_MAX;
+        });
     }
 
     void render() const
     {
-        const auto light_position = glm::vec3(-6, -12, 15);
-        const auto model = glm::rotate(glm::mat4(1.0f), static_cast<float>(0.25 * M_PI), glm::vec3(0, 0, 1));
-
         glDisable(GL_BLEND);
         glDisable(GL_CULL_FACE);
-        glEnable(GL_MULTISAMPLE);
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LESS);
+
+        const auto light_position = glm::vec3(-6, 4, 6);
+
+        const auto cos_30 = std::cos(M_PI / 6.0);
+        const auto x_offset = std::fmod(static_cast<float>(cur_time_) / CycleDuration, 1.0) * 4.0 * cos_30;
+        auto model =
+            glm::rotate(glm::mat4(1.0f), static_cast<float>(0.25 * M_PI), glm::vec3(0, 0, 1)) *
+            glm::translate(glm::mat4(1.0f), glm::vec3(-x_offset, 0, 0));
 
         // shadow
 
@@ -121,7 +127,7 @@ private:
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(4, 4);
 
-        draw_grid(program_, model);
+        draw_grid(shadow_program_, model, x_offset);
 
         glDisable(GL_POLYGON_OFFSET_FILL);
         shadow_buffer_.unbind();
@@ -133,12 +139,9 @@ private:
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_LESS);
-
         const auto projection =
                 glm::perspective(glm::radians(45.0f), static_cast<float>(window_width_) / window_height_, 0.1f, 100.f);
-        const auto camera_position = /* glm::vec3(0, 0, 7); */ glm::vec3(0, -6, 12);
+        const auto camera_position = /* glm::vec3(0, 0, 7); */ glm::vec3(0, -6, 15);
         const auto look_at = glm::vec3(0, 0, 0);
         const auto view = glm::lookAt(camera_position, look_at, glm::vec3(0, 1, 0));
 
@@ -147,16 +150,51 @@ private:
         program_.bind();
         program_.set_uniform("viewProjectionMatrix", projection * view);
         program_.set_uniform("lightPosition", light_position);
-        program_.set_uniform("color", glm::vec3(1.0));
         program_.set_uniform("lightViewProjection", light_projection * light_view);
         program_.set_uniform("shadowMapTexture", 0);
 
-        draw_grid(program_, model);
+        draw_grid(program_, model, x_offset);
     }
 
-    void draw_grid(const gl::shader_program &program, const glm::mat4 &model) const
+    void draw_grid(const gl::shader_program &program, const glm::mat4 &model, float x_offset) const
     {
         const auto cos_30 = std::cos(M_PI / 6.0);
+
+        constexpr const auto StepHeight = 3.0;
+
+        const auto tile_height = [cos_30, &model, x_offset](float x, float drop_start) -> float {
+            constexpr const auto DropDuration = 0.3;
+            const auto max_offset = 2 * cos_30;
+
+            x -= x_offset;
+            drop_start *= (1.0 - DropDuration);
+
+            if (x < -max_offset)
+            {
+                return 0;
+            }
+            else if (x > max_offset)
+            {
+                return StepHeight;
+            }
+            else
+            {
+                float t = (x + max_offset) / (2 * max_offset);
+                if (t < drop_start)
+                {
+                    return 0;
+                }
+                else if (t > drop_start + DropDuration)
+                {
+                    return StepHeight;
+                }
+                else
+                {
+                    float s = ((t - drop_start) / DropDuration);
+                    return out_quadratic(s) * StepHeight;
+                }
+            }
+        };
 
         // hexagons
 
@@ -167,10 +205,10 @@ private:
                 const auto y = 2.0 * (i - 0.5 * (GridRows - 1));
 
                 const auto t = glm::translate(glm::mat4(1.0), glm::vec3(x, y, 0));
-                program_.set_uniform("modelMatrix", model * t);
+                program.set_uniform("modelMatrix", model * t);
 
-                const float height = 2.5f * (1.0f + std::sin(cur_time_ + hexagon_heights_[i][j]));
-                program_.set_uniform("height", height);
+                const float height = tile_height(x, hexagon_heights_[i]);
+                program.set_uniform("height", height);
 
                 glDrawArrays(GL_LINE_LOOP, 0, 6);
             }
@@ -185,10 +223,10 @@ private:
                 const auto y = 2.0 * (i - 0.5 * (GridRows - 2));
 
                 const auto t = glm::translate(glm::mat4(1.0), glm::vec3(x, y, 0));
-                program_.set_uniform("modelMatrix", model * t);
+                program.set_uniform("modelMatrix", model * t);
 
-                const float height = 2.5f * (1.0f + std::sin(cur_time_ + diamond_heights_[i][j]));
-                program_.set_uniform("height", height);
+                const float height = tile_height(x, diamond_heights_[i]);
+                program.set_uniform("height", height);
 
                 glDrawArrays(GL_LINE_LOOP, 0, 4);
             }
@@ -201,10 +239,10 @@ private:
     static constexpr auto ShadowHeight = ShadowWidth;
 
     static constexpr auto GridRows = 12;
-    static constexpr auto GridColumns = 12;
+    static constexpr auto GridColumns = 14;
 
-    std::array<std::array<float, GridColumns>, GridRows> hexagon_heights_;
-    std::array<std::array<float, GridColumns - 1>, GridRows - 1> diamond_heights_;
+    std::array<float, GridRows> hexagon_heights_;
+    std::array<float, GridRows - 1> diamond_heights_;
 
     int window_width_;
     int window_height_;
@@ -219,8 +257,8 @@ private:
 
 int main()
 {
-    constexpr auto window_width = 800;
-    constexpr auto window_height = 800;
+    constexpr auto window_width = 1024;
+    constexpr auto window_height = 1024;
 
     gl::window w(window_width, window_height, "demo");
 
