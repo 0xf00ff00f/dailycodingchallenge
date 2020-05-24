@@ -38,43 +38,43 @@ void main(void)
     vec4 p4 = vec4(0.0, 0.0, height, 1.0);
 
     gs_position = vec3(modelMatrix * p0);
-	gs_positionInLightSpace = shadowMatrix * lightViewProjection * modelMatrix * p0;
+    gs_positionInLightSpace = shadowMatrix * lightViewProjection * modelMatrix * p0;
     gs_normal = side_normal;
     gl_Position = mvp * p0;
     EmitVertex();
 
     gs_position = vec3(modelMatrix * p1);
-	gs_positionInLightSpace = shadowMatrix * lightViewProjection * modelMatrix * p1;
+    gs_positionInLightSpace = shadowMatrix * lightViewProjection * modelMatrix * p1;
     gs_normal = side_normal;
     gl_Position = mvp * p1;
     EmitVertex();
 
     gs_position = vec3(modelMatrix * p2);
-	gs_positionInLightSpace = shadowMatrix * lightViewProjection * modelMatrix * p2;
+    gs_positionInLightSpace = shadowMatrix * lightViewProjection * modelMatrix * p2;
     gs_normal = side_normal;
     gl_Position = mvp * p2;
     EmitVertex();
 
     gs_position = vec3(modelMatrix * p3);
-	gs_positionInLightSpace = shadowMatrix * lightViewProjection * modelMatrix * p3;
+    gs_positionInLightSpace = shadowMatrix * lightViewProjection * modelMatrix * p3;
     gs_normal = side_normal;
     gl_Position = mvp * p3;
     EmitVertex();
 
     gs_position = vec3(modelMatrix * p2);
-	gs_positionInLightSpace = shadowMatrix * lightViewProjection * modelMatrix * p2;
+    gs_positionInLightSpace = shadowMatrix * lightViewProjection * modelMatrix * p2;
     gs_normal = up_normal;
     gl_Position = mvp * p2;
     EmitVertex();
 
     gs_position = vec3(modelMatrix * p3);
-	gs_positionInLightSpace = shadowMatrix * lightViewProjection * modelMatrix * p3;
+    gs_positionInLightSpace = shadowMatrix * lightViewProjection * modelMatrix * p3;
     gs_normal = up_normal;
     gl_Position = mvp * p3;
     EmitVertex();
 
     gs_position = vec3(modelMatrix * p4);
-	gs_positionInLightSpace = shadowMatrix * lightViewProjection * modelMatrix * p4;
+    gs_positionInLightSpace = shadowMatrix * lightViewProjection * modelMatrix * p4;
     gs_normal = up_normal;
     gl_Position = mvp * p4;
     EmitVertex();
