@@ -19,7 +19,7 @@
 #include <iostream>
 #include <memory>
 
-// #define DUMP_FRAMES
+#define DUMP_FRAMES
 
 constexpr const auto CycleDuration = 4.f;
 #ifdef DUMP_FRAMES
@@ -78,16 +78,19 @@ public:
                 const auto na = glm::normalize(n0 + n3);
                 const auto nb = glm::normalize(n1 + n2);
 
-                const auto u0 = static_cast<float>(i) / NumSegmentsOuter + u_offset;
-                const auto u1 = static_cast<float>(i + 1) / NumSegmentsOuter + u_offset;
+                const auto s0 = 4.0 * (static_cast<float>(i) / NumSegmentsOuter + u_offset);
+                const auto s1 = 4.0 * (static_cast<float>(i + 1) / NumSegmentsOuter + u_offset);
 
-                *verts++ = {v0, na, {u0, 0}};
-                *verts++ = {v1, nb, {u1, 0}};
-                *verts++ = {v2, nb, {u1, 1}};
+                const auto t0 = static_cast<float>(j) / NumSegmentsInner;
+                const auto t1 = static_cast<float>(j + 1) / NumSegmentsInner;
 
-                *verts++ = {v2, nb, {u1, 1}};
-                *verts++ = {v3, na, {u0, 1}};
-                *verts++ = {v0, na, {u0, 0}};
+                *verts++ = {v0, na, {s0, t0}};
+                *verts++ = {v1, nb, {s1, t0}};
+                *verts++ = {v2, nb, {s1, t1}};
+
+                *verts++ = {v2, nb, {s1, t1}};
+                *verts++ = {v3, na, {s0, t1}};
+                *verts++ = {v0, na, {s0, t0}};
             }
         }
 
@@ -135,8 +138,9 @@ private:
     {
         const auto light_position = glm::vec3(-1, -1, 3);
 
-        const float angle = -cur_time_ * 2.f * M_PI / CycleDuration;
-        geometry_.update_verts(angle, 0);
+        const float angle = cur_time_ * 2.f * M_PI / CycleDuration;
+        const float u_offset = cur_time_ / CycleDuration / 4;
+        geometry_.update_verts(angle, u_offset);
 
 #if 0
         const float angle = -cur_time_ * 2.f * M_PI / CycleDuration / CircleVerts;
