@@ -138,6 +138,9 @@ public:
 
     void bind() const { glBindVertexArray(vao_); }
 
+    GLuint array_buffer_handle() const { return vbo_[0]; }
+    GLuint element_array_buffer_handle() const { return vbo_[1]; }
+
 private:
     GLuint vao_;
     GLuint vbo_[2];
