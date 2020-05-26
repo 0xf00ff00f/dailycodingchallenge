@@ -19,7 +19,7 @@
 #include <iostream>
 #include <memory>
 
-#define DUMP_FRAMES
+// #define DUMP_FRAMES
 
 constexpr const auto CycleDuration = 4.f;
 #ifdef DUMP_FRAMES

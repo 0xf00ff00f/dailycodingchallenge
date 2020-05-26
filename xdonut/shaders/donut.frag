@@ -16,7 +16,7 @@ float random(vec2 st)
 
 float pattern(vec2 id, vec2 p, vec2 offs)
 {
-    id += offs;
+    id = mod(id + offs, 12);
     float r = 0.5 * random(id);
     vec2 o = vec2(random(id + vec2(0, 1)), random(id + vec2(1, 0))) + offs;
     float d = distance(p, o);
@@ -25,7 +25,7 @@ float pattern(vec2 id, vec2 p, vec2 offs)
 
 void main(void)
 {
-    vec2 uv = vec2(vs_uv.x * 8.0, vs_uv.y);
+    vec2 uv = vec2(vs_uv.x * 12.0, vs_uv.y);
     uv *= 8.0;
 
     vec2 p = fract(uv) - 0.5;
