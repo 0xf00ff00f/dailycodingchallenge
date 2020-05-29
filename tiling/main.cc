@@ -1,6 +1,6 @@
 #include "panic.h"
 
-#include "window.h"
+#include "demo.h"
 #include "geometry.h"
 #include "shader_program.h"
 #include "shadow_buffer.h"
@@ -22,21 +22,11 @@
 #include <iostream>
 #include <memory>
 
-// #define DUMP_FRAMES
-
-constexpr const auto CycleDuration = 3.f;
-#ifdef DUMP_FRAMES
-constexpr const auto FramesPerSecond = 40;
-#else
-constexpr const auto FramesPerSecond = 60;
-#endif
-
-class Demo
+class Demo : public gl::demo
 {
 public:
-    Demo(int window_width, int window_height)
-        : window_width_(window_width)
-        , window_height_(window_height)
+    Demo(int argc, char *argv[])
+        : gl::demo(argc, argv)
         , shadow_buffer_(ShadowWidth, ShadowHeight)
         , hexagon_states_(GL_SHADER_STORAGE_BUFFER, GridRows * GridColumns)
         , diamond_states_(GL_SHADER_STORAGE_BUFFER, (GridRows - 1) * (GridColumns - 1))
@@ -44,12 +34,6 @@ public:
         initialize_shader();
         initialize_geometry();
         initialize_heights();
-    }
-
-    void render_and_step(float dt)
-    {
-        render();
-        cur_time_ += dt;
     }
 
 private:
@@ -99,7 +83,12 @@ private:
         });
     }
 
-    void render() const
+    void update(float dt) override
+    {
+        cur_time_ += dt;
+    }
+
+    void render() override
     {
         glDisable(GL_BLEND);
         glEnable(GL_DEPTH_TEST);
@@ -108,7 +97,7 @@ private:
         const auto light_position = glm::vec3(-6, 4, 6);
 
         const auto cos_30 = std::cos(M_PI / 6.0);
-        const auto x_offset = std::fmod(static_cast<float>(cur_time_) / CycleDuration, 1.0) * 4.0 * cos_30;
+        const auto x_offset = std::fmod(static_cast<float>(cur_time_) / cycle_duration_, 1.0) * 4.0 * cos_30;
         auto model =
             glm::rotate(glm::mat4(1.0f), static_cast<float>(0.25 * M_PI), glm::vec3(0, 0, 1)) *
             glm::translate(glm::mat4(1.0f), glm::vec3(-x_offset, 0, 0));
@@ -139,13 +128,13 @@ private:
 
         // render
 
-        glViewport(0, 0, window_width_, window_height_);
+        glViewport(0, 0, width_, height_);
         glClearColor(0, 0, 0, 0);
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         const auto projection =
-                glm::perspective(glm::radians(45.0f), static_cast<float>(window_width_) / window_height_, 0.1f, 100.f);
+                glm::perspective(glm::radians(45.0f), static_cast<float>(width_) / height_, 0.1f, 100.f);
         const auto camera_position = /* glm::vec3(0, 0, 7); */ glm::vec3(0, -6, 15);
         const auto look_at = glm::vec3(0, 0, 0);
         const auto view = glm::lookAt(camera_position, look_at, glm::vec3(0, 1, 0));
@@ -260,8 +249,6 @@ private:
     std::array<float, GridRows> hexagon_heights_;
     std::array<float, GridRows - 1> diamond_heights_;
 
-    int window_width_;
-    int window_height_;
     float cur_time_ = 0;
     gl::shader_program program_;
     gl::shader_program shadow_program_;
@@ -278,50 +265,8 @@ private:
     gl::buffer<TileState> diamond_states_;
 };
 
-int main()
+int main(int argc, char *argv[])
 {
-    constexpr auto window_width = 1024;
-    constexpr auto window_height = 1024;
-
-    gl::window w(window_width, window_height, "demo");
-
-    glfwSetKeyCallback(w, [](GLFWwindow *window, int key, int scancode, int action, int mode) {
-        if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-            glfwSetWindowShouldClose(window, GL_TRUE);
-    });
-
-#ifdef DUMP_FRAMES
-    constexpr auto total_frames = CycleDuration * FramesPerSecond;
-    auto frame_num = 0;
-#endif
-
-    {
-        Demo d(window_width, window_height);
-
-#ifndef DUMP_FRAMES
-        double curTime = glfwGetTime();
-#endif
-        while (!glfwWindowShouldClose(w)) {
-#ifndef DUMP_FRAMES
-            auto now = glfwGetTime();
-            const auto dt = now - curTime;
-            curTime = now;
-#else
-            constexpr auto dt = 1.0f / FramesPerSecond;
-#endif
-            d.render_and_step(dt);
-
-#ifdef DUMP_FRAMES
-            char path[80];
-            std::sprintf(path, "%05d.ppm", frame_num);
-            dump_frame_to_file(path, window_width, window_height);
-
-            if (++frame_num == total_frames)
-                break;
-#endif
-
-            glfwSwapBuffers(w);
-            glfwPollEvents();
-        }
-    }
+    Demo d(argc, argv);
+    d.run();
 }

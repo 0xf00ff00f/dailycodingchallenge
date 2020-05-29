@@ -7,16 +7,4 @@ add_custom_command(
     DEPENDS ${ASSET_DIR})
 
 add_executable(xdonut main.cc ${DEST_ASSETS})
-
-target_link_libraries(
-    xdonut
-    PUBLIC
-    ${OPENGL_LIBRARIES}
-    ${GLFW3_LIBRARY}
-    ${GLEW_LIBRARIES}
-    common)
-
-target_include_directories(
-    xdonut
-    PUBLIC
-    "${PROJECT_SOURCE_DIR}/common")
+target_link_libraries(xdonut common)
