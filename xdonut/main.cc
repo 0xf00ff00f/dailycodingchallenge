@@ -19,8 +19,6 @@
 #include <iostream>
 #include <memory>
 
-// #define DUMP_FRAMES
-
 class DonutGeometry
 {
 public:
