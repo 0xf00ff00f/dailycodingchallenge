@@ -44,7 +44,7 @@ void main(void)
 
     const float height = 0.2;
     const vec3 front_color = vec3(1, 1, 0);
-    const vec3 back_color = vec3(0.5, 0.5, 1);
+    const vec3 back_color = vec3(0.46, 0.35, .6);
 
     vec4 p00 = vec4(0.0, 0.0, height, 1.0);
 

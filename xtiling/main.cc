@@ -44,20 +44,23 @@ private:
 
     void initialize_geometry()
     {
+        const auto m = 0.1;
+        const auto a = 1 - m;
+        const auto b = 0.5 - m;
         using Vertex = std::tuple<glm::vec2>;
-        static const std::vector<Vertex> verts = {
-            { glm::vec2(-1, 0.5) },
-            { glm::vec2(-0.5, 0.5) },
-            { glm::vec2(-0.5, 1) },
-            { glm::vec2(0.5, 1) },
-            { glm::vec2(0.5, 0.5) },
-            { glm::vec2(1, 0.5) },
-            { glm::vec2(1, -0.5) },
-            { glm::vec2(0.5, -0.5) },
-            { glm::vec2(0.5, -1) },
-            { glm::vec2(-0.5, -1) },
-            { glm::vec2(-0.5, -0.5) },
-            { glm::vec2(-1, -0.5) }
+        const std::vector<Vertex> verts = {
+            { glm::vec2(-a, b) },
+            { glm::vec2(-b, b) },
+            { glm::vec2(-b, a) },
+            { glm::vec2(b, a) },
+            { glm::vec2(b, b) },
+            { glm::vec2(a, b) },
+            { glm::vec2(a, -b) },
+            { glm::vec2(b, -b) },
+            { glm::vec2(b, -a) },
+            { glm::vec2(-b, -a) },
+            { glm::vec2(-b, -b) },
+            { glm::vec2(-a, -b) }
         };
         tile_.set_data(verts);
     }
@@ -73,12 +76,19 @@ private:
         {
             for (int j = 0; j < GridColumns; ++j)
             {
+                auto x = 2.0 * (j - (0.5 * GridColumns -1));
+                if (i % 2)
+                    x += 1.0;
+                const auto y = 1.5 * (i - 0.5 * (GridRows - 1));
+
+                const auto d = glm::length(glm::vec2(x, y));
+
                 auto &animation = flip_start_[i][j];
-                animation.s0 = std::clamp(static_cast<float>(d0(generator)), 0.0f, static_cast<float>(cycle_duration_));
-                animation.s1 = std::clamp(static_cast<float>(d1(generator)), 0.0f, static_cast<float>(cycle_duration_));
+                animation.s0 = 0.25 * cycle_duration_ + 0.03 * d;
+                animation.s1 = 0.75 * cycle_duration_ + 0.03 * d;
                 animation.flop = rand() % 4;
-                animation.h0 = 1.0 + 7.0 * static_cast<float>(rand()) / RAND_MAX;
-                animation.h1 = 1.0 + 7.0 * static_cast<float>(rand()) / RAND_MAX;
+                animation.h0 = 3.0 + 5.0 * static_cast<float>(rand()) / RAND_MAX;
+                animation.h1 = 3.0 + 5.0 * static_cast<float>(rand()) / RAND_MAX;
             }
         }
     }
@@ -94,7 +104,7 @@ private:
         glEnable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
 
-        const auto light_position = glm::vec3(-6, 4, 6) * 2.5f;
+        const auto light_position = glm::vec3(-4, 3, 6) * 2.5f;
 
 #if 0
         const float angle = 2.0 * M_PI * cur_time_ / cycle_duration_;
@@ -154,6 +164,8 @@ private:
     {
         tile_.bind();
 
+        float time = fmod(cur_time_, cycle_duration_);
+
         for (int i = 0; i < GridRows; ++i)
         {
             for (int j = 0; j < GridColumns; ++j)
@@ -165,17 +177,17 @@ private:
                 const auto t = glm::translate(glm::mat4(1.0), glm::vec3(x, y, 0));
                 const auto &animation = flip_start_[i][j];
                 float a, h;
-                if (cur_time_ < animation.s0) {
+                if (time < animation.s0) {
                     a = h = 0;
-                } else if (cur_time_ < animation.s0 + FlipDuration) {
-                    const auto t = (cur_time_ - animation.s0) / FlipDuration;
+                } else if (time < animation.s0 + FlipDuration) {
+                    const auto t = (time - animation.s0) / FlipDuration;
                     a = in_quadratic(t) * M_PI;
                     h = (1 - (2*t - 1)*(2*t - 1)) * animation.h0;
-                } else if (cur_time_ < animation.s1) {
+                } else if (time < animation.s1) {
                     a = M_PI;
                     h = 0;
-                } else if (cur_time_ < animation.s1 + FlipDuration) {
-                    const auto t = (cur_time_ - animation.s1) / FlipDuration;
+                } else if (time < animation.s1 + FlipDuration) {
+                    const auto t = (time - animation.s1) / FlipDuration;
                     a = M_PI + in_quadratic(t) * M_PI;
                     h = (1 - (2*t - 1)*(2*t - 1)) * animation.h1;
                 } else {
