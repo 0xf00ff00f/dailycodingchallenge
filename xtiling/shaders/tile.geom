@@ -35,7 +35,7 @@ void main(void)
     mat3 normalMatrix = mat3(modelMatrix);
     mat4 mvp = viewProjectionMatrix * modelMatrix;
 
-    vec2 d = vs_position[0] - vs_position[1];
+    vec2 d = vs_position[1] - vs_position[0];
     vec3 side_normal = normalMatrix * normalize(vec3(-d.y, d.x, 0.0));
     vec3 up_normal = normalMatrix * vec3(0.0, 0.0, 1.0);
 
