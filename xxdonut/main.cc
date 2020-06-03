@@ -139,7 +139,7 @@ private:
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         draw_scene(program_, glm::vec3(0));
-        framebuffer::unbind();
+        gl::framebuffer::unbind();
 
         glViewport(0, 0, width_, height_);
         glClearColor(0.25, 0.25, 0.25, 1.0);
@@ -147,15 +147,7 @@ private:
 
         draw_scene(program_, glm::vec3(1));
 
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-#if 0
-        glViewport(0, 0, width_, height_);
-        glClearColor(0, 0, 0, 0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-#endif
-        blur_->render(width_, height_);
+        blur_->render(width_, height_, 4);
     }
 
     void draw_scene(gl::shader_program &program, const glm::vec3 &base_color)

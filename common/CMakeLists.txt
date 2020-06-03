@@ -5,7 +5,8 @@ add_library(common STATIC
     demo.cc
     tween.cc
     shadow_buffer.cc
-    multi_shadow_buffer.cc)
+    multi_shadow_buffer.cc
+    framebuffer.cc)
 
 target_link_libraries(common
     PUBLIC

@@ -6,5 +6,5 @@ add_custom_command(
     COMMAND ln -s ${ASSET_DIR} ${DEST_ASSETS}
     DEPENDS ${ASSET_DIR})
 
-add_executable(xxdonut main.cc framebuffer.cc ${DEST_ASSETS})
+add_executable(xxdonut main.cc blur_effect.cc ${DEST_ASSETS})
 target_link_libraries(xxdonut common)
