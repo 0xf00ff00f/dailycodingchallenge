@@ -43,7 +43,7 @@ glm::vec3 rand_point()
     const auto r = [] {
         return 2.0f * static_cast<float>(std::rand()) / RAND_MAX - 1.0f;
     };
-    return glm::vec3(r(), r(), r()) * 2.5f;
+    return glm::vec3(r(), r(), r()) * 1.5f;
 }
 
 class Demo : public gl::demo
@@ -54,7 +54,7 @@ public:
     struct Edge
     {
         static constexpr const auto ControlPointCount = 5;
-        static constexpr const auto NumStates = 4;
+        static constexpr const auto NumStates = 3;
         std::array<std::array<glm::vec3, NumStates>, ControlPointCount> control_points;
     };
 
@@ -120,13 +120,13 @@ private:
 
         const auto projection =
                 glm::perspective(glm::radians(45.0f), static_cast<float>(width_) / height_, 0.1f, 100.f);
-        const auto eye = glm::vec3(0, 4, 4);
+        const auto eye = glm::vec3(3, 3, 3);
         const auto center = glm::vec3(0, 0, 0);
         const auto up = glm::vec3(0, 1, 0);
         const auto view = glm::lookAt(eye, center, up);
 
 #if 1
-        const float angle = 0.5f * cosf(cur_time_ * 2.f * M_PI / cycle_duration_);
+        const float angle = 0.5f * sinf(cur_time_ * 2.f * M_PI / cycle_duration_);
         // const float angle = cur_time_ * 2.f * M_PI / cycle_duration_;
         const auto model = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0, 1, 0));
 #else
@@ -135,19 +135,30 @@ private:
 
         program_.bind();
         program_.set_uniform("mvp", projection * view * model);
-        program_.set_uniform("color", glm::vec4(1, 0, 0, 1));
-
-        blur_->bind();
 
         glEnable(GL_LINE_SMOOTH);
         glLineWidth(8.0);
 
-        glViewport(0, 0, blur_->width(), blur_->height());
-        glClearColor(0, 0, 0, 0);
-        glClear(GL_COLOR_BUFFER_BIT);
-        render_scene();
-        gl::framebuffer::unbind();
+        const auto render_blurry = [this](const glm::vec4 &color, int num_passes) {
+            program_.set_uniform("color", color);
 
+            blur_->bind();
+            glViewport(0, 0, blur_->width(), blur_->height());
+            glClearColor(0, 0, 0, 0);
+            glClear(GL_COLOR_BUFFER_BIT);
+            render_scene();
+            gl::framebuffer::unbind();
+
+            glViewport(0, 0, width_, height_);
+            blur_->render(width_, height_, num_passes);
+        };
+
+        glViewport(0, 0, width_, height_);
+        glClearColor(0.25, 0.25, 0.25, 1);
+        glClear(GL_COLOR_BUFFER_BIT);
+        render_blurry(glm::vec4(1, 1, 1, 1), 1);
+
+#if 0
         glLineWidth(2.0);
         program_.set_uniform("color", glm::vec4(1, 1, 1, 1));
 
@@ -155,31 +166,32 @@ private:
         glClearColor(0.25, 0.25, 0.25, 1);
         glClear(GL_COLOR_BUFFER_BIT);
         render_scene();
-
-        blur_->render(width_, height_, 2);
+#endif
     }
 
     void render_scene()
     {
-        const float t = [this]() -> float {
-            const auto TransitionDuration = 0.15 * cycle_duration_;
-            const auto T0 = 0.25 * cycle_duration_;
-            const auto T1 = 0.75 * cycle_duration_;
-            float time = fmod(cur_time_, cycle_duration_);
+        float cycle_duration = static_cast<float>(cycle_duration_) / Edge::NumStates;
+        float time_in_cycle = fmod(cur_time_, cycle_duration);
+
+        const float t = [this, cycle_duration]() -> float {
+            const auto TransitionDuration = 0.3 * cycle_duration;
+            const auto T0 = 0.5 * cycle_duration;
+            float time = fmod(cur_time_, cycle_duration);
             if (time < T0) {
                 return 0;
             } else if (time < T0 + TransitionDuration) {
-                return in_quadratic((time - T0) / TransitionDuration);
-            } else if (time < T1) {
-                return 1;
-            } else if (time < T1 + TransitionDuration) {
-                return out_quadratic(1 - (time - T1) / TransitionDuration);
+                return out_quadratic((time - T0) / TransitionDuration);
             } else {
-                return 0;
+                return 1;
             }
         }();
+        const int i0 = fmod(cur_time_, cycle_duration_) / cycle_duration;
+        const int i1 = (i0 + 1) % Edge::NumStates;
         for (const auto &edge : edges_)
-            render_edge(edge, 0, 1, t);
+        {
+            render_edge(edge, i0, i1, t);
+        }
     }
 
     void render_edge(const Edge &edge, int prev_state, int next_state, float t)
@@ -231,6 +243,8 @@ private:
 
 int main(int argc, char *argv[])
 {
+    std::srand(time(nullptr));
+
     Demo d(argc, argv);
     d.run();
 }
