@@ -1,0 +1,49 @@
+#version 450 core
+
+in vec3 vs_position;
+in vec3 vs_normal;
+in vec2 vs_uv;
+
+out vec4 fragColor;
+
+uniform vec3 lightPosition;
+uniform vec3 color;
+
+float random(vec2 st)
+{
+    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+}
+
+float pattern(vec2 id, vec2 p, vec2 offs)
+{
+    id = mod(id + offs, 32);
+    float r = 0.5 * random(id);
+    vec2 o = vec2(random(id + vec2(0, 1)), random(id + vec2(1, 0))) + offs;
+    float d = distance(p, o);
+    return 1.0 - smoothstep(r - .05, r, d);
+}
+
+void main(void)
+{
+    /*
+    vec2 uv = vs_uv * 32.0;
+
+    vec2 p = fract(uv) - 0.5;
+    vec2 id = floor(uv);
+
+    float l = 0;
+    for (float i = -1; i <= 1; ++i)
+    {
+        for (float j = -1; j <= 1; ++j)
+        {
+            l += pattern(id, p, vec2(i, j));
+        }
+    }
+    vec3 color = mix(vec3(0, 0, 1), vec3(1), clamp(l, 0, 1));
+    */
+    vec3 color = vec3(1);
+
+    // float intensity = max(dot(vs_normal, normalize(lightPosition - vs_position)), 0.0);
+    float intensity = min(0.25 + abs(dot(vs_normal, normalize(lightPosition - vs_position))), 1.0);
+    fragColor = vec4(intensity * color, 0.75);
+}

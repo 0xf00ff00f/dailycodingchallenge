@@ -20,6 +20,40 @@
 #include <iostream>
 #include <memory>
 
+class PlaneGeometry
+{
+public:
+    PlaneGeometry(const glm::vec3 &center, const glm::vec3 &up, const glm::vec3 &side)
+    {
+        initialize_geometry(center, up, side);
+        geometry_.set_data(verts_);
+    }
+
+    void render() const
+    {
+        geometry_.bind();
+        glDrawArrays(GL_TRIANGLES, 0, verts_.size());
+    }
+
+private:
+    void initialize_geometry(const glm::vec3 &center, const glm::vec3 &up, const glm::vec3 &side)
+    {
+        const auto normal = glm::normalize(glm::cross(up, side));
+
+        verts_.push_back({center - up - side, normal, glm::vec2(0, 0)});
+        verts_.push_back({center + up - side, normal, glm::vec2(1, 0)});
+        verts_.push_back({center + up + side, normal, glm::vec2(1, 1)});
+
+        verts_.push_back({center + up + side, normal, glm::vec2(1, 1)});
+        verts_.push_back({center - up + side, normal, glm::vec2(0, 1)});
+        verts_.push_back({center - up - side, normal, glm::vec2(0, 0)});
+    }
+
+    using Vertex = std::tuple<glm::vec3, glm::vec3, glm::vec2>; // position, normal, texuv
+    std::vector<Vertex> verts_;
+    gl::geometry geometry_;
+};
+
 class DonutGeometry
 {
 public:
@@ -46,14 +80,17 @@ public:
                 const auto vert_at = [angle_offset, small_radius, big_radius](int i, int j) -> std::tuple<glm::vec3, glm::vec3> {
                     const float a = static_cast<float>(i) * 2.0 * M_PI / NumSegmentsOuter;
 
-                    float b = static_cast<float>(j) * 2.0 * M_PI / NumSegmentsInner + a + angle_offset;
+                    const float b = static_cast<float>(j) * 2.0 * M_PI / NumSegmentsInner + a + angle_offset;
 
                     const auto p = glm::vec3(cosf(a) * big_radius, sinf(a) * big_radius, 0.0);
 
                     const auto u = glm::vec3(cosf(a), sinf(a), 0.0);
                     const auto v = glm::vec3(0.0, 0.0, 1.0);
 
-                    const auto pos = p + (sinf(b) * u + cosf(b) * v) * small_radius;
+                    const float s = 0.5 * (1.0 + cos(a - M_PI));
+                    const float r = small_radius * (0.25 + 1.5 * s);
+
+                    const auto pos = p + (sinf(b) * u + cosf(b) * v) * r;
                     const auto normal = glm::normalize(pos - p);
 
                     return {pos, normal};
@@ -104,17 +141,22 @@ class Demo : public gl::demo
 public:
     Demo(int argc, char *argv[])
         : gl::demo(argc, argv)
+        , plane_(glm::vec3(0, 0, 0), glm::vec3(6, 0, 0), glm::vec3(0, 0, 6))
     {
-        blur_.reset(new blur_effect(width_/8, height_/8));
+        blur_.reset(new blur_effect(width_/4, height_/4));
         initialize_shader();
     }
 
 private:
     void initialize_shader()
     {
-        program_.add_shader(GL_VERTEX_SHADER, "shaders/donut.vert");
-        program_.add_shader(GL_FRAGMENT_SHADER, "shaders/donut.frag");
-        program_.link();
+        donut_program_.add_shader(GL_VERTEX_SHADER, "shaders/donut.vert");
+        donut_program_.add_shader(GL_FRAGMENT_SHADER, "shaders/donut.frag");
+        donut_program_.link();
+
+        plane_program_.add_shader(GL_VERTEX_SHADER, "shaders/plane.vert");
+        plane_program_.add_shader(GL_FRAGMENT_SHADER, "shaders/plane.frag");
+        plane_program_.link();
     }
 
     void update(float dt) override
@@ -128,65 +170,120 @@ private:
         glEnable(GL_DEPTH_TEST);
         glDisable(GL_MULTISAMPLE);
 
-        const float angle = cur_time_ * 2.f * M_PI / cycle_duration_;
-        const float u_offset = cur_time_ / cycle_duration_ / 4;
-        geometry_.update_verts(DonutSmallRadius, DonutRadius, angle, u_offset);
+        {
+            const float angle = cur_time_ * 2.f * M_PI / cycle_duration_;
+            const float u_offset = cur_time_ / cycle_duration_ / 4;
+            geometry_.update_verts(DonutSmallRadius, DonutRadius, angle, u_offset);
+        }
 
+#if 0
+        const float angle = 0.5f * cosf(cur_time_ * 2.f * M_PI / cycle_duration_);
+        // const float angle = 0.5f * cur_time_ * 2.f * M_PI / cycle_duration_;
+        const auto model = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(0, 1, 0));
+#else
+        auto model = glm::mat4(1.0f); // glm::translate(glm::mat4(1.0f), glm::vec3(0, 1.5, 0));
+#endif
+
+        const auto projection =
+                glm::perspective(glm::radians(45.0f), static_cast<float>(width_) / height_, 0.1f, 100.f);
+        const auto eye = glm::vec3(-1, 4, 3);
+        const auto center = glm::vec3(0, 0, 0);
+        const auto up = glm::vec3(0, 1, 0);
+        const auto view = glm::lookAt(eye, center, up);
+        const auto viewProjection = projection * view;
+
+#if 0
         blur_->bind();
 
         glViewport(0, 0, blur_->width(), blur_->height());
         glClearColor(0, 0, 0, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        draw_scene(program_, glm::vec3(0));
+        draw_scene(program_, glm::vec3(0), model);
         gl::framebuffer::unbind();
+#endif
+
+#if 0
+        blur_->render(width_, height_, 4);
+#endif
+
+        // reflection
+
+        blur_->bind();
+        glViewport(0, 0, blur_->width(), blur_->height());
+        glClearColor(0, 0, 0, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        draw_scene(donut_program_, glm::vec3(1), viewProjection, glm::scale(model, glm::vec3(1, -1, 1)));
+        gl::framebuffer::unbind();
+
+        // scene
 
         glViewport(0, 0, width_, height_);
         glClearColor(0.25, 0.25, 0.25, 1.0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        draw_scene(program_, glm::vec3(1));
-
         blur_->render(width_, height_, 4);
+
+        glEnable(GL_DEPTH_TEST);
+        draw_plane(plane_program_, viewProjection, model);
+
+#if 1
+        // bloom
+
+        blur_->bind();
+        glViewport(0, 0, blur_->width(), blur_->height());
+        glClearColor(0, 0, 0, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        draw_scene(donut_program_, glm::vec3(0), viewProjection, model);
+        gl::framebuffer::unbind();
+
+        glViewport(0, 0, width_, height_);
+        draw_scene(donut_program_, glm::vec3(1), viewProjection, model);
+
+        blur_->render(width_, height_, 2);
+#else
+        draw_scene(donut_program_, glm::vec3(1), viewProjection, model);
+#endif
     }
 
-    void draw_scene(gl::shader_program &program, const glm::vec3 &base_color)
+    void draw_plane(gl::shader_program &program, const glm::mat4 &viewProjection, const glm::mat4 &model)
     {
         const auto light_position = glm::vec3(-1, -1, 3);
 
-#if 1
-        const float angle = 0.3f * cosf(cur_time_ * 2.f * M_PI / cycle_duration_);
-        const auto model = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(-1, 1, 1));
-#else
-        const auto model = glm::identity<glm::mat4x4>();
-#endif
+        program.bind();
+        program.set_uniform("mvp", viewProjection * model);
+        program.set_uniform("modelMatrix", model);
+        program.set_uniform("lightPosition", light_position);
 
-        const auto projection =
-                glm::perspective(glm::radians(45.0f), static_cast<float>(width_) / height_, 0.1f, 100.f);
-        const auto eye = glm::vec3(-1, 2, 3);
-        const auto center = glm::vec3(0, 0, 0);
-        const auto up = glm::vec3(0, 1, 0);
-        const auto view = glm::lookAt(eye, center, up);
-        const auto viewProjection = projection * view;
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        plane_.render();
+        glDisable(GL_BLEND);
+    }
 
-        program_.bind();
-        program_.set_uniform("modelMatrix", model);
-        program_.set_uniform("lightPosition", light_position);
-        program_.set_uniform("color", glm::vec3(1, 0, 0));
-        program_.set_uniform("baseColor", base_color);
+    void draw_scene(gl::shader_program &program, const glm::vec3 &base_color, const glm::mat4 &viewProjection, const glm::mat4 &model)
+    {
+        const auto light_position = glm::vec3(-1, -1, 3);
 
+        program.bind();
+        program.set_uniform("lightPosition", light_position);
+        program.set_uniform("color", glm::vec3(1, 0, 0));
+        program.set_uniform("baseColor", base_color);
+
+        const auto translation = glm::translate(glm::mat4(1.0), glm::vec3(0, 1.0, 0));
         {
             const auto r = glm::rotate(glm::mat4(1.0), static_cast<float>(0.5f * M_PI), glm::vec3(1, 0, 0));
-            const auto t = glm::translate(glm::mat4(1.0), glm::vec3(-0.5, 0, 0));
-            const auto m = model * r * t;
-            program_.set_uniform("mvp", viewProjection * m);
-            program_.set_uniform("modelMatrix", m);
+            const auto t = glm::translate(glm::mat4(1.0), glm::vec3(-0.75, 0, 0));
+            const auto m = model * translation * r * t;
+            program.set_uniform("mvp", viewProjection * m);
+            program.set_uniform("modelMatrix", m);
             geometry_.render();
         }
 
         {
-            const auto t = glm::translate(glm::mat4(1.0), glm::vec3(0.5, 0, 0));
-            const auto m = model * t;
+            const auto r = glm::rotate(glm::mat4(1.0), static_cast<float>(M_PI), glm::vec3(0, 1, 0));
+            const auto t = glm::translate(glm::mat4(1.0), glm::vec3(0.75, 0, 0));
+            const auto m = model * translation * t * r;
             program.set_uniform("mvp", viewProjection * m);
             program.set_uniform("modelMatrix", m);
             geometry_.render();
@@ -197,8 +294,9 @@ private:
     static constexpr float DonutSmallRadius = 0.25f;
 
     float cur_time_ = 0;
-    gl::shader_program program_;
+    gl::shader_program donut_program_, plane_program_;
     DonutGeometry geometry_;
+    PlaneGeometry plane_;
     std::unique_ptr<blur_effect> blur_;
 };
 
